@@ -159,8 +159,7 @@ domain = get_domain_from_input_user()
 stored_data = defaultdict() # we need this variable for cumulative fields where we need a memory of the previous time step
 for index, term in enumerate(terms):
     for name_nc, infos in dict_name_nc.items():
-        vortex_ressource = get_vortex_ressource()
-        array = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
+        array = infos['compute'](get_vortex_ressource(), *infos["fa_fields_required"], domain,
                                  term=term, initial_term=initial_term, stored_data=stored_data)
         add_to_netcdf(name_nc, array)
 
