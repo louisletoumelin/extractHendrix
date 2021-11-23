@@ -134,6 +134,16 @@ def select_namespace():
 
 def add_necessary_data_to_SURFEX():
     # todo implement the function
+    callSystemOrDie("ncap2 -O -s 'FORC_TIME_STEP=3600.' " + forcing_file + " " + forcing_file)
+    callSystemOrDie("ncap2 -O -s 'CO2air=Tair*0. + 0.00062' " + forcing_file + " " + forcing_file)
+    #   callSystemOrDie("ncap2 -O -s 'Wind_DIR=Tair*0. + 0.' "+forcing_file+" "+forcing_file)
+    callSystemOrDie("ncap2 -O -s 'UREF=ZS*0. + 10.' " + forcing_file + " " + forcing_file)
+    callSystemOrDie("ncap2 -O -s 'ZREF=ZS*0. + 2.' " + forcing_file + " " + forcing_file)
+    callSystemOrDie(
+        "ncap2 -O -s'slope=ZS*0.+0.;aspect=ZS*0.+0.;FRC_TIME_STP=FORC_TIME_STEP' " + forcing_file + " " + forcing_file)
+    callSystemOrDie("ncrename -O -v latitude,LAT " + forcing_file)
+    callSystemOrDie("ncrename -O -v longitude,LON " + forcing_file)
+    callSystemOrDie("ncks -O --mk_rec_dmn time " + forcing_file + " " + forcing_file)
     pass
 
 
