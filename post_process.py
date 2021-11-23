@@ -8,7 +8,7 @@ def difference(vortexreader_readfield, var1, var2, *args):
     vortexreader_readfield(var1).get_data() - vortexreader_readfield(var2).get_data()
 
 
-def cumul(vortex_ressource, name_fa, domain, term, initial_term, stored_data, *args):
+def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, stored_data=None, **kwargs):
     if term > 0:
         field = vortex_ressource.readfield(name_fa)
         field = extract_domain(field, domain)
@@ -31,10 +31,29 @@ def cumul(vortex_ressource, name_fa, domain, term, initial_term, stored_data, *a
     else:
         print("Term==0: no cumulative data")
 
-            # Treatment for non-cumulative field (NOTA: wind gust field changes name over time in the FA files => add IG)
+
+def cumul_snow_graupel(vortex_ressource, name_fa_snow, name_fa_graupel, domain,
+                       term=None, initial_term=None, stored_data=None, **kwargs):
+    snow = cumul(vortex_ressource, name_fa_snow, domain,
+                 term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+    graupel = cumul(vortex_ressource, name_fa_graupel, domain,
+                    term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+
+    return snow + graupel
 
 
-def default(vortex_ressource, name_fa, domain, *args):
+def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_sur, domain,
+               term=None, initial_term=None, stored_data=None, **kwargs):
+
+    surfrayt_sola_de = cumul(vortex_ressource, name_fa_surfrayt_sola_de, domain,
+                             term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+    surfrayt_dir_sur = cumul(vortex_ressource, name_fa_surfrayt_dir_sur, domain,
+                             term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+
+    return surfrayt_sola_de - surfrayt_dir_sur
+
+
+def default(vortex_ressource, name_fa, domain, **kwargs):
     field = vortex_ressource.readfield(name_fa)
     field = extract_domain(field, domain)
     return field.get_data()
@@ -54,7 +73,7 @@ def _select_name_wind_gust(new_name_u, new_name_v, old_name_u, old_name_v, list_
     return u_name, v_name
 
 
-def wind_gust(vortex_ressource, new_name_u, new_name_v, old_name_u, old_name_v, domain, *args):
+def wind_gust(vortex_ressource, new_name_u, new_name_v, old_name_u, old_name_v, domain, **kwargs):
     """
     Input: vortex ressource
     Output: numpy array
@@ -82,7 +101,7 @@ def wind_gust(vortex_ressource, new_name_u, new_name_v, old_name_u, old_name_v, 
     return wind_gust
 
 
-def wind_speed_from_components(vortex_ressource, name_u, name_v, domain, *args):
+def wind_speed_from_components(vortex_ressource, name_u, name_v, domain, **kwargs):
 
     u = vortex_ressource.readfield(name_u)
     v = vortex_ressource.readfield(name_v)
@@ -106,7 +125,7 @@ def wind_speed_from_components(vortex_ressource, name_u, name_v, domain, *args):
     return wind_speed
 
 
-def wind_direction_from_components(vortex_ressource, name_u, name_v, domain, *args):
+def wind_direction_from_components(vortex_ressource, name_u, name_v, domain, **kwargs):
     u = vortex_ressource.readfield(name_u)
     v = vortex_ressource.readfield(name_v)
 
@@ -128,15 +147,15 @@ def wind_direction_from_components(vortex_ressource, name_u, name_v, domain, *ar
     return wind_direction
 
 
-def Psurf(vortex_ressource, name_fa, domain, *args):
+def Psurf(vortex_ressource, name_fa, domain, **kwargs):
     field = vortex_ressource.readfield(name_fa)
     field = extract_domain(field, domain)
     field = field.operation('exp')
     return field.get_data()
 
 
-def zs(vortex_ressource, name_fa, domain, index, *args):
-    if index == 0:
+def zs(vortex_ressource, name_fa, domain, term=None, **kwargs):
+    if term == 0:
         zs = vortex_ressource.readfield(name_fa)
 
         if zs.spectral:

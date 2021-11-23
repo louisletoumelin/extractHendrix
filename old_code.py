@@ -157,7 +157,6 @@ def save_in_nc(domain,champs,alti_zoom,ltair,date_beg,date_end):
 
 # Write all the fields in the NetCdf forcing file
    for fld in champs.values():
-       if ((fld.fid['FA'] == 'SURFACCPLUIE') | (fld.fid['FA'] == 'SURFACCNEIGE') | (fld.fid['FA'] == 'SURFACCGRAUPEL')): print 'store nc: ',fld.fid
        fld.fid['netCDF'] = dict_FA2nc_tot[fld.fid['FA']]  # conversion de nom
        output_resource.writefield(fld)
 
@@ -392,81 +391,10 @@ def extract_day(date, liste_dom, ltair, lmescan, analysis_time, initialterm, fin
             rr_aro = champs[dd]['SURFACCPLUIE'].getdata()
             sn_aro = champs[dd]['SURFACCGRAUPEL'].getdata()+champs[dd]['SURFACCNEIGE'].getdata()
 
-            if(lmescan):
-                # Total daily percipitation from MESCAN
-                precip_tot_ana = ma.masked_array(champs_j[dd]['SURFPREC.ANA.EAU'].getdata()+champs_j[dd]['SURFPREC.ANA.NEI'].getdata())
 
-                # Total daily percipitation forecasted by AROME
-                if(nterm==1):
-                    precip_tot_aro = ma.masked_array(champs[dd]['SURFACCPLUIE'].getdata()*3600.+champs[dd]['SURFACCGRAUPEL'].getdata()*3600.+champs[dd]['SURFACCNEIGE'].getdata()*3600.)
-                else:
-                    precip_tot_aro = ma.masked_array((champs[dd]['SURFACCPLUIE'].getdata()*3600.).sum(axis=0)+(champs[dd]['SURFACCGRAUPEL'].getdata()*3600.).sum(axis=0)+(champs[dd]['SURFACCNEIGE'].getdata()*3600.).sum(axis=0))
-
-                # Ratio of total daily percipitation used to scale precipitation forecasted by AROME
-                ratio = ma.masked_array(precip_tot_ana/precip_tot_aro,mask=(precip_tot_aro==0.),fill_value=1./24.,dtype=np.float32)
-
-                if(nterm==1):
-                   ni = np.shape(rr_aro)[0]
-                   nj = np.shape(rr_aro)[1]
-                   rr_ana = rr_aro
-                   sn_ana = sn_aro
-                else:
-                   ni = np.shape(rr_aro)[1]
-                   nj = np.shape(rr_aro)[2]
-                   rr_ana = np.zeros((nterm,ni,nj),float)
-                   sn_ana = np.zeros((nterm,ni,nj),float)
-                   #List of points that require a specific treatment: no precip in AROME and precip in MESCAN
-                   zz = np.nonzero((precip_tot_aro == 0.) & (precip_tot_ana > 0.))
-
-                   dec = initialterm+1
-
-                   for term in terms:
-                       if (term == initialterm):
-                           continue
-                       else:
-                           #Scale AROME precip using the ratio previously computed
-                           rr_ana[term-dec,:,:] = list(ratio*rr_aro[term-dec,:,:])
-                           sn_ana[term-dec,:,:] = list(ratio*sn_aro[term-dec,:,:])
-
-                           # Special treatment for points where no precipitation are forecasted by AROME
-                           # 1st step: assume constant hourly precipitation rates and a phase separation based on a 1 deg threshold as in SAFRAN
-                           mask_pos = ( (champs[dd]['CLSTEMPERATURE'].getdata()[term-dec,:,:]> 274.15) & (precip_tot_aro[:,:] == 0.) )
-                           mask_neg = ( (champs[dd]['CLSTEMPERATURE'].getdata()[term-dec,:,:]< 274.15) & (precip_tot_aro[:,:] == 0.) )
-                           rr_ana[term-dec,mask_pos] = precip_tot_ana[mask_pos]/(24.*3600.)
-                           sn_ana[term-dec,mask_pos] = 0.
-                           sn_ana[term-dec,mask_neg] = precip_tot_ana[mask_neg]/(24.*3600.)
-                           rr_ana[term-dec,mask_neg] = 0.
-
-                    # Special treatment for points where no precipitation are forecasted by AROME
-                    # 2st step: the hourly distribution of forecast precipitation of the nearest grid point
-                    # with positive daily forecast precip in a circle of 50 km are used
-                   mask_aro_pos = (precip_tot_aro[:,:] > 0.)
-
-                   for pos in range(0,np.shape(zz[0])[0]):
-                       ii = zz[0][pos]
-                       jj = zz[1][pos]
-                       x,y=np.ogrid[-ii:ni-ii,-jj:nj-jj]#disc :-x:nx-x, -y:ny-y
-                       x= x.astype(np.float)*1.3
-                       y= y.astype(np.float)*1.3
-                       dist_sqr = x**2.+y**2.
-
-                       dist_sel = np.amin(dist_sqr[mask_aro_pos])
-                       if(dist_sel**0.5<50):
-                           tt=np.nonzero((precip_tot_aro > 0.) & (dist_sqr == dist_sel))
-                           ii_aro = tt[0][0]
-                           jj_aro = tt[1][0]
-                           rr_ana[:,ii,jj] =  precip_tot_ana[ii,jj]/precip_tot_aro[ii_aro,jj_aro]*rr_aro[:,ii_aro,jj_aro]
-                           sn_ana[:,ii,jj] =  precip_tot_ana[ii,jj]/precip_tot_aro[ii_aro,jj_aro]*sn_aro[:,ii_aro,jj_aro]
-
-                # Define final fields from the precipitation analysis
-                champs[dd]['SURFPREC.ANA.EAU'].setdata(rr_ana)
-                champs[dd]['SURFPREC.ANA.NEI'].setdata(sn_ana)
-
-            else:
-
-                # MESCAN is not used: Snowf_Ana=Snowf_forecast and Rnowf_Ana=Rnowf_forecast
-                champs[dd]['SURFPREC.ANA.EAU'].setdata(rr_aro)
-                champs[dd]['SURFPREC.ANA.NEI'].setdata(sn_aro)
+            # MESCAN is not used: Snowf_Ana=Snowf_forecast and Rnowf_Ana=Rnowf_forecast
+            champs[dd]['SURFPREC.ANA.EAU'].setdata(rr_aro)
+            champs[dd]['SURFPREC.ANA.NEI'].setdata(sn_aro)
 
 
         # Built NetCDF file for each domain
