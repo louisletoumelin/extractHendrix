@@ -103,6 +103,11 @@ def get_days_of_simulation_from_user():
     pass
 
 
+def get_variable_to_extract_from_input_user():
+    # todo implement this function
+    pass
+
+
 def select_namespace():
     # todo clean this implementation
     namespace =  'oper.archive.fr'  # archive + local cache : le temps de mettre au point le script, C)vite de retransfC)rer les fichiers C  chaque fois
@@ -119,7 +124,7 @@ def select_namespace():
 
 def get_vortex_ressource():
     """This function search for existing ressource description and get it using epygram"""
-    #todo implement this function
+    # todo implement this function
 
     resource_description = dict(experiment='B6LR',  # oper suite
                                 kind='analysis',  # model state
@@ -143,17 +148,20 @@ def get_vortex_ressource():
 
 
 init_netcdf_file()
-initial_term, terms = get_terms_from_input_user()
 days = get_days_of_simulation_from_user()
+initial_term, terms = get_terms_from_input_user()
 domain = get_domain_from_input_user()
+variables_to_extract = get_variable_to_extract_from_input_user()
 
 stored_data = defaultdict() # we need this variable for cumulative fields where we need a memory of the previous time step
 for day in days:
     for index, term in enumerate(terms):
-        for variable_name_nc, infos in dict_name_nc.items():
-            array = infos['compute'](get_vortex_ressource(), *infos["fa_fields_required"], domain,
+        vortex_ressource = get_vortex_ressource() # Load vortex file once then extract variables
+        for variable_nc in variables_to_extract:
+            infos = dict_name_nc["variable_nc"]
+            array = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
                                      term=term, initial_term=initial_term, stored_data=stored_data)
-            add_to_netcdf(variable_name_nc, array)
+            add_to_netcdf(variable_nc, array)
 
 add_SURFEX_metadata_to_nc()
 

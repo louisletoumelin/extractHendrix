@@ -21,6 +21,11 @@ def add_to_netcdf():
     pass
 
 
+def concatenate_final_netcdf():
+    #todo implement this function
+    pass
+
+
 def add_SURFEX_metadata_to_nc():
     # todo implement the function
     callSystemOrDie("ncap2 -O -s 'FORC_TIME_STEP=3600.' " + forcing_file + " " + forcing_file)
