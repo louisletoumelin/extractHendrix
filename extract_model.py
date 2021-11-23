@@ -1,25 +1,31 @@
-from post_process import difference, cumul, postprocess_default, wind_speed_from_components, \
-    postprocess_wind_gust, wind_direction_from_components
+from collections import defaultdict
 
-#todo implement the following variables
-{'CLSHUMI.SPECIFIQ':'Qair',
-                  'SURFPRESSION':'PSurf','SPECSURFGEOPOTEN':'ZS', 'SURFACCPLUIE':'Rainf',
-                  'SURFACCNEIGE':'Snowf','SURFACCGRAUPEL':'Grauf','SURFRAYT THER DE':'LWdown',
-                  'SURFRAYT SOLA DE':'SCA_SWdown','SURFRAYT DIR SUR':'DIR_SWdown','CLSVENT.ZONAL':'Wind',
-                  'SURFPREC.ANA.EAU':'Rainf_ana','SURFPREC.ANA.NEI':'Snowf_ana'
+from post_process import *
+
+#todo implement the following variables in name_nc
+dict_variables_to_implement = \
+{
+ 'SURFACCPLUIE':'Rainf',
+ 'SURFACCNEIGE':'Snowf',
+ 'SURFACCGRAUPEL':'Grauf',
+ 'SURFRAYT THER DE':'LWdown',
+ 'SURFRAYT SOLA DE':'SCA_SWdown',
+ 'SURFRAYT DIR SUR':'DIR_SWdown',
+ 'SURFPREC.ANA.EAU':'Rainf_ana',
+ 'SURFPREC.ANA.NEI':'Snowf_ana'
                        }
 name_nc  = {   'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],
-                        compute=postprocess_default,
+                        compute=default,
                         details="Diagnostic temperature"),
                'T1':
                    dict(fa_fields_required=['S090TEMPERATURE'],
-                        compute=postprocess_default,
+                        compute=default,
                         details="Prognostic lowest level temperature"),
 
                'SCA_SWdown':
                    dict(fa_fields_required=['SURFRAYT SOLA DE', 'SURFRAYT DIR SUR'],
-                        #todo change this function
+                        #todo change the function "difference"
                         compute=difference),
 
                'Wind':
@@ -29,7 +35,7 @@ name_nc  = {   'Tair':
                'Wind_Gust':
                    # Wind gust name has changed few years ago
                    dict(fa_fields_required=['CLSU.RAF60M.XFU', 'CLSV.RAF60M.XFU', 'CLSU.RAF.MOD.XFU', 'CLSV.RAF.MOD.XFU'],
-                        compute=postprocess_wind_gust),
+                        compute=wind_gust),
 
                'Wind_DIR':
                    dict(fa_fields_required =['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
@@ -37,8 +43,31 @@ name_nc  = {   'Tair':
 
                'ts':
                    dict(fa_fields_required=['SURFTEMPERATURE'],
-                        compute=wind_direction_from_components),
+                        compute=default),
 
+                # todo 1/3: Isabelle used the prognostic humidity and stored it in Qair. Now prognostic humidity is Q1. We
+                # todo 2/3: should create a function that put the values of Q1 inside Qair when the user desires
+                # todo 3/3: prognostic humidity to force SURFEX
+               'Qair':
+                   dict(fa_fields_required=['CLSHUMI.SPECIFIQ'],
+                        compute=default,
+                        details="Diagnostic specifiq humidity at 2m a.g.l."),
+
+               'Q1':
+                   dict(fa_fields_required=['S090HUMI.SPECIFI'],
+                        compute=default,
+                        details="Prognostic specific humidity at the lowest vertical level in the model"),
+
+               'PSurf':
+                   dict(fa_fields_required=['SURFPRESSION'],
+                        compute=Psurf,
+                        details="Surface pressure"),
+
+               'ZS':
+                   dict(fa_fields_required=['SPECSURFGEOPOTEN'],
+                        compute=zs,
+                        details="Surface elevation. "
+                                "This variable is added once to the netcdf: during the first forecast term"),
                }
 
 
@@ -63,10 +92,13 @@ def get_terms():
     # todo implement this function
     pass
 
+
 def add_to_netcdf():
     pass
 
+
 def select_namespace():
+    # todo clean this implementation
     namespace =  'oper.archive.fr'  # archive + local cache : le temps de mettre au point le script, C)vite de retransfC)rer les fichiers C  chaque fois
     #IG++
     if date_beg.date() > datetime.date(2019,7,2): # date codee en dur : elle correspond au moment ou la localisation des archives a change.
@@ -78,44 +110,37 @@ def select_namespace():
     #IG--
     namespace2 = 'olive.archive.fr' # Name space for MESCAN experiment
 
+
 def add_necessary_data_to_SURFEX():
+    # todo implement the function
     pass
 
 
+def get_vortex_ressource():
+    #todo implement this function
+    pass
+
 init_netcdf_file()
-term = get_terms()
+terms = get_terms()
+
+# we need this variable for cumulative fields where we need a memory of the previous time step
+stored_data = defaultdict()
 for index, term in enumerate(terms):
     for name, infos in name_nc.items():
-        compute_func = infos['compute']
-        final[name] = compute_func(vortexreader_readfield, *infos[fields_required], index)
-        add_to_netcdf()
+        vortex_ressource = get_vortex_ressource()
+        array = infos['compute'](vortex_ressource, *infos[fields_required], term, stored_data)
+        add_to_netcdf(array)
 
 
 
 
 
-# Utilisateur: rentre
-
+# Input from the user
+"""
 01/01/2018
 02/01/2018
-temp, diagnostic
+Tair
 humidity, prognostic
 rayonnement,
 vent
-
-# TODO: fonction de lecture Vortex
-# lire tous les fields_required dans name_nc -> names_fa
-# data_from_vortex =  {}
-# for name in names_fa:
-#      data[name] = vortex.readfield(var1)
-
-# for name in name_nc:
-#     final_array = name_nc[compute].get_data()(data, *fields_required)
-
-
-# fonctions :
-
-# lecture d'un champ FA (argument: nom_fa) (et le mapping pour field_alternate)
-
-# transformation des champs FA en champs finaux
-
+"""
