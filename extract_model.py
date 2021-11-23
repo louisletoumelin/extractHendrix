@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from netcdf import *
 from post_process import *
 
 
@@ -83,19 +84,6 @@ dict_name_nc  = {
                }
 
 
-def init_netcdf_file():
-    forcing_file = 'FORCING_day_' + domain + '_' + date_beg.strftime("%Y%m%d%H") + '_' + date_end.strftime(
-        "%Y%m%d%H") + '.nc'
-    output_resource = epygram.formats.resource(forcing_file, 'w',
-                                               fmt='netCDF')  # on ouvre le netCDF de sortie en écriture
-    # et on lui dit quel comportement on veut qu'il adopte (du point de vue conventions netCDF)
-    output_resource.behave(N_dimension='Number_of_points',
-                           X_dimension='xx',
-                           Y_dimension='yy',
-                           force_a_T_dimension=True
-                           )
-
-
 def get_terms_from_input_user():
     """
     Input = config file from user
@@ -110,11 +98,8 @@ def get_domain_from_input_user():
     pass
 
 
-def add_to_netcdf():
-    """
-    This function takes an array and add it to a netcdf file. If the variable already exists, it appends the array
-    to the time dimension
-    """
+def get_days_of_simulation_from_user():
+    # todo implement this function
     pass
 
 
@@ -132,38 +117,45 @@ def select_namespace():
     namespace2 = 'olive.archive.fr' # Name space for MESCAN experiment
 
 
-def add_necessary_data_to_SURFEX():
-    # todo implement the function
-    callSystemOrDie("ncap2 -O -s 'FORC_TIME_STEP=3600.' " + forcing_file + " " + forcing_file)
-    callSystemOrDie("ncap2 -O -s 'CO2air=Tair*0. + 0.00062' " + forcing_file + " " + forcing_file)
-    #   callSystemOrDie("ncap2 -O -s 'Wind_DIR=Tair*0. + 0.' "+forcing_file+" "+forcing_file)
-    callSystemOrDie("ncap2 -O -s 'UREF=ZS*0. + 10.' " + forcing_file + " " + forcing_file)
-    callSystemOrDie("ncap2 -O -s 'ZREF=ZS*0. + 2.' " + forcing_file + " " + forcing_file)
-    callSystemOrDie(
-        "ncap2 -O -s'slope=ZS*0.+0.;aspect=ZS*0.+0.;FRC_TIME_STP=FORC_TIME_STEP' " + forcing_file + " " + forcing_file)
-    callSystemOrDie("ncrename -O -v latitude,LAT " + forcing_file)
-    callSystemOrDie("ncrename -O -v longitude,LON " + forcing_file)
-    callSystemOrDie("ncks -O --mk_rec_dmn time " + forcing_file + " " + forcing_file)
-    pass
-
-
 def get_vortex_ressource():
     """This function search for existing ressource description and get it using epygram"""
     #todo implement this function
+
+    resource_description = dict(experiment='B6LR',  # oper suite
+                                kind='analysis',  # model state
+                                block='surfan',
+                                date=date + datetime.timedelta(hours=30),
+                                # Next day is used since the analysis is done between D-1 6 and D 6
+                                term=6,
+                                geometry='franmgsp',  # the name of the model domain
+                                local=nom_temporaire_local_ana,  # the local filename of the resource, once fetched.
+                                cutoff='assim',  # type of cutoff // 'prod' vs 'assim'
+                                vapp='arome',  # type of application in operations namespace
+                                vconf='france',  # name of config in operation namespace
+                                model='arome',  # name of the model, usually = vapp
+                                origin='canari',
+                                namespace=namespace2)
+
+    r1 = \
+        usevortex.get_resources(getmode='epygram',  # on veut récupérer l'objet epygram correspondant à la ressource
+                                **resource_description)[0]
     pass
+
 
 init_netcdf_file()
 initial_term, terms = get_terms_from_input_user()
+days = get_days_of_simulation_from_user()
 domain = get_domain_from_input_user()
 
 stored_data = defaultdict() # we need this variable for cumulative fields where we need a memory of the previous time step
-for index, term in enumerate(terms):
-    for name_nc, infos in dict_name_nc.items():
-        array = infos['compute'](get_vortex_ressource(), *infos["fa_fields_required"], domain,
-                                 term=term, initial_term=initial_term, stored_data=stored_data)
-        add_to_netcdf(name_nc, array)
+for day in days:
+    for index, term in enumerate(terms):
+        for variable_name_nc, infos in dict_name_nc.items():
+            array = infos['compute'](get_vortex_ressource(), *infos["fa_fields_required"], domain,
+                                     term=term, initial_term=initial_term, stored_data=stored_data)
+            add_to_netcdf(variable_name_nc, array)
 
-
+add_SURFEX_metadata_to_nc()
 
 
 
