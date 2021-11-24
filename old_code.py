@@ -185,46 +185,28 @@ def extract_day(date, liste_dom, ltair, lmescan, analysis_time, initialterm, fin
     Main routine to extract, process and write AROME and MESCAN required to build SURFEX forcing
     """
 
-    # Define dates to be used for extraction
     date_beg = date + datetime.timedelta(hours=analysis_time + (initialterm + 1))
     date_end = date + datetime.timedelta(hours=analysis_time + finalterm)
 
-    # List of temrs
     terms = range(initialterm, finalterm + 1)
-    print
-    terms
+
     # Local name of dowloaded ICMSH files
     nom_temporaire_local = 'hist_arome_[term].fa'  # mais l'idée est qu'on n'a pas besoin de manipuler explicitement ce nom de fichier
     nom_temporaire_local_ana = 'hist_arome_ana.fa'  # mais l'idée est qu'on n'a pas besoin de manipuler explicitement ce nom de fichier
 
-    ####################
-    # Fields to extract
-    ####################
-    # Instantaneous fields
+
     champs_a_extraire = ['CLSTEMPERATURE', 'S090TEMPERATURE', 'CLSHUMI.SPECIFIQ', 'S090HUMI.SPECIFI', 'SURFPRESSION',
                          'CLSVENT.ZONAL', 'CLSVENT.MERIDIEN',
                          'CLSU.RAF60M.XFU', 'CLSV.RAF60M.XFU']
-    # Cumulated fields
     champs_cum = ['SURFACCPLUIE', 'SURFACCNEIGE', 'SURFACCGRAUPEL', 'SURFRAYT THER DE', 'SURFRAYT SOLA DE',
                   'SURFRAYT DIR SUR']
-    # MESCAN fields
     champs_cum_ana = ['SURFPREC.ANA.EAU', 'SURFPREC.ANA.NEI']
 
     namespace = 'oper.archive.fr'  # archive + local cache : le temps de mettre au point le script, C)vite de retransfC)rer les fichiers C  chaque fois
-    # IG++
     if date_beg.date() > datetime.date(2019, 7,
                                        2):  # date codee en dur : elle correspond au moment ou la localisation des archives a change.
-        # print('date > 2 juil 2019\n')
-        # print(date_beg)
         namespace = 'vortex.archive.fr'  # the files we request are archived (on hendrix), coming from DSI suites
-        # print('ISA check namespace\n')
-        # print(namespace)
-    # IG--
     namespace2 = 'olive.archive.fr'  # Name space for MESCAN experiment
-
-    ####################
-    # Initialize variables
-    ####################
 
     champs = {}
     champs_j = {}
@@ -236,9 +218,6 @@ def extract_day(date, liste_dom, ltair, lmescan, analysis_time, initialterm, fin
         champs_j[dd] = {}
         data_sto[dd] = {}
 
-    ####################
-    # Read and process MESCAN precipitation
-    ####################
     if (lmescan):
         # Define resoucrce description
         # MESCAN experiment have carried out by Camille Birman
@@ -313,15 +292,19 @@ def extract_day(date, liste_dom, ltair, lmescan, analysis_time, initialterm, fin
             # Treatment for cumulative field
             # Separate case initialterm=0 (no cumulative fluxes in 0 file) and initialterm>0
             for f in champs_cum:
+
                 if (term == 0):
                     print 'Init from +00'
                 else:
                     fld = r.readfield(f)  # lecture du champ
+
                 for dd in liste_dom:
+
                     if (term == 0):
                         print 'Init from +00'
                     else:
                         fld_zoom = extract_domain(fld, dd)
+
                     if term == initialterm:
                         # Conversion: - from mm to kg/m2/s for precip
                         #              - from J/m2 to W/m2 for incoming LW and SW

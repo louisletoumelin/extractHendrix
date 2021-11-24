@@ -1,6 +1,6 @@
 """all codes related with netcdf goes here"""
 
-def init_netcdf_file():
+def init_daily_netcdf_file():
     forcing_file = 'FORCING_day_' + domain + '_' + date_beg.strftime("%Y%m%d%H") + '_' + date_end.strftime(
         "%Y%m%d%H") + '.nc'
     output_resource = epygram.formats.resource(forcing_file, 'w',
@@ -12,7 +12,7 @@ def init_netcdf_file():
                            force_a_T_dimension=True
                            )
 
-def add_to_netcdf():
+def add_hourly_array_to_netcdf():
     """
     This function takes an array and add it to a netcdf file. If the variable already exists, it appends the array
     to the time dimension
@@ -22,6 +22,11 @@ def add_to_netcdf():
 
 
 def concatenate_final_netcdf():
+    #todo implement this function
+    pass
+
+
+def create_first_hour_netcdf():
     #todo implement this function
     pass
 
@@ -38,4 +43,9 @@ def add_SURFEX_metadata_to_nc():
     callSystemOrDie("ncrename -O -v latitude,LAT " + forcing_file)
     callSystemOrDie("ncrename -O -v longitude,LON " + forcing_file)
     callSystemOrDie("ncks -O --mk_rec_dmn time " + forcing_file + " " + forcing_file)
+    pass
+
+
+def create_daily_netcdf():
+    #todo implement this function
     pass

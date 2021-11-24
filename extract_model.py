@@ -84,7 +84,7 @@ dict_name_nc  = {
                }
 
 
-def get_terms_from_input_user():
+def _get_terms_from_input_user():
     """
     Input = config file from user
     Output = tuple(initial_term, list of terms)
@@ -93,17 +93,21 @@ def get_terms_from_input_user():
     pass
 
 
-def get_domain_from_input_user():
+def _get_domain_from_input_user():
     # todo implement this function
     pass
 
 
-def get_days_of_simulation_from_user():
+def _get_dates_of_simulation_from_input_user():
+    """
+    Input: user file
+    Output: dates
+    """
     # todo implement this function
     pass
 
 
-def get_variable_to_extract_from_input_user():
+def _get_variable_to_extract_from_input_user():
     # todo implement this function
     pass
 
@@ -122,7 +126,7 @@ def select_namespace():
     namespace2 = 'olive.archive.fr' # Name space for MESCAN experiment
 
 
-def get_vortex_ressource():
+def _get_vortex_ressource():
     """This function search for existing ressource description and get it using epygram"""
     # todo implement this function
 
@@ -147,23 +151,37 @@ def get_vortex_ressource():
     pass
 
 
-init_netcdf_file()
-days = get_days_of_simulation_from_user()
-initial_term, terms = get_terms_from_input_user()
-domain = get_domain_from_input_user()
-variables_to_extract = get_variable_to_extract_from_input_user()
+def get_input_user():
+    dates = _get_dates_of_simulation_from_input_user()
+    initial_term, terms = _get_terms_from_input_user()
+    domain = _get_domain_from_input_user()
+    variables_to_extract = _get_variable_to_extract_from_input_user()
+
+    return dates, initial_term, domain, variables_to_extract
+
+
+dates, initial_term, terms, domain, variables_to_extract = get_input_user()
+
+
+# extract simulation at ay -1 and between end_term-1 and end_term
+# first file is FORCING_day_alp_2020060206_2020060206.nc
+# next files are FORCING_day_alp_20200*0*07_20200*0*06.nc
+init_daily_netcdf_file()
+initial_vortex_ressource = get_vortex_ressource(date-1 day, end_term-1)
+create_first_hour_netcdf(initial_vortex_ressource)
+
 
 stored_data = defaultdict() # we need this variable for cumulative fields where we need a memory of the previous time step
-for day in days:
-    for index, term in enumerate(terms):
-        vortex_ressource = get_vortex_ressource() # Load vortex file once then extract variables
-        for variable_nc in variables_to_extract:
-            infos = dict_name_nc["variable_nc"]
-            array = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
+for idx_date, date in enumerate(dates):
+    init_daily_netcdf_file()
+    for idx_term, term in enumerate(terms):
+        vortex_ressource = get_vortex_ressource(date, term) # Load vortex file once then extract variables
+        for name_variable_nc in variables_to_extract:
+            infos = dict_name_nc[name_variable_nc]
+            hourly_array = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
                                      term=term, initial_term=initial_term, stored_data=stored_data)
-            add_to_netcdf(variable_nc, array)
-
-add_SURFEX_metadata_to_nc()
+            add_hourly_array_to_netcdf(name_variable_nc, hourly_array)
+    add_SURFEX_metadata_to_nc()
 
 
 
@@ -172,7 +190,7 @@ add_SURFEX_metadata_to_nc()
 01/01/2018
 02/01/2018
 Tair
-humidity, prognostic
+humidity
 rayonnement,
 vent
 """
