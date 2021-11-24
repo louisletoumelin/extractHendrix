@@ -95,7 +95,11 @@ check_if_files_are_already_downloaded_at_CEN()
 # next files are FORCING_day_alp_20200*0*07_20200*0*06.nc
 init_daily_netcdf_file()
 initial_vortex_ressource = get_vortex_ressource()
-add_hourly_array_to_netcdf(initial_vortex_ressource)
+for name_variable_nc in variables_to_extract:
+    infos = dict_name_nc[name_variable_nc]
+    field = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
+                             term=term, initial_term=initial_term, stored_data=stored_data)
+    add_hourly_field_to_netcdf(name_variable_nc, field)
 
 
 stored_data = defaultdict() # we need this variable for cumulative fields where we need a memory of the previous time step
@@ -103,10 +107,13 @@ try:
     for idx_date, date in enumerate(dates):
         init_daily_netcdf_file()
         for idx_term, term in enumerate(terms):
-            # todo: for Hugo: I think we can "readfields" instead of "readfield", see in the doc,
+
+            # for Hugo: I think we can "readfields" instead of "readfield", see in the doc,
             #  meaning that we can access many variables at once... If we implement it we should modify our code
             # http://www.umr-cnrm.fr/gmapdoc/meshtml/EPYGRAM1.4.3/_modules/epygram/base.html#Field
+
             vortex_ressource = get_vortex_ressource(date, term) # Load vortex file once then extract variables
+            # Maybe storing each fields in a dictionary is necessary?
             for name_variable_nc in variables_to_extract:
                 infos = dict_name_nc[name_variable_nc]
                 field = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
