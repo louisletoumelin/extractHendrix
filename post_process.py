@@ -15,7 +15,7 @@ def default(vortex_ressource, name_fa, domain, **kwargs):
     """
     field = vortex_ressource.readfield(name_fa)
     field = extract_domain(field, domain)
-    return field.get_data()
+    return field
 
 
 def _select_name_wind_gust(new_name_u, new_name_v, old_name_u, old_name_v, list_variables):
@@ -83,7 +83,7 @@ def wind_gust(vortex_ressource, new_name_u, new_name_v, old_name_u, old_name_v, 
     v_gust = extract_domain(v_gust, domain)
 
     vectwind = epygram.fields.make_vector_field(u_gust, v_gust)
-    wind_gust = vectwind.to_module().get_data()
+    wind_gust = vectwind.to_module()
 
     return wind_gust
 
@@ -109,8 +109,7 @@ def wind_speed_from_components(vortex_ressource, name_u, name_v, domain, **kwarg
 
     # todo this operation is replicated for wind direction, maybe merge it
     wind_vector = epygram.fields.make_vector_field(u, v)
-    wind_speed = wind_vector.to_module().get_data()
-    #wind_direction = wind_vector.compute_direction().get_data()
+    wind_speed = wind_vector.to_module()
 
     return wind_speed
 
@@ -136,7 +135,7 @@ def wind_direction_from_components(vortex_ressource, name_u, name_v, domain, **k
 
     # todo this operation is replicated for wind direction, maybe merge it
     wind_vector = epygram.fields.make_vector_field(u, v)
-    wind_direction = wind_vector.compute_direction().get_data()
+    wind_direction = wind_vector.compute_direction()
 
     return wind_direction
 
@@ -149,7 +148,7 @@ def Psurf(vortex_ressource, name_fa, domain, **kwargs):
     field = vortex_ressource.readfield(name_fa)
     field = extract_domain(field, domain)
     field = field.operation('exp')
-    return field.get_data()
+    return field
 
 
 def zs(vortex_ressource, name_fa, domain, term=None, inital_term=None, **kwargs):
@@ -167,7 +166,8 @@ def zs(vortex_ressource, name_fa, domain, term=None, inital_term=None, **kwargs)
 
         zs = extract_domain(zs, domain)
         zs.validity = epygram.base.FieldValidity()
-        return zs.getdata() / 9.81
+        #todo verify that scalar_operation method (from epygram) works
+        return zs.scalar_operation('/', 9.81)
 
 
 def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, stored_data=None, **kwargs):
@@ -179,17 +179,19 @@ def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, store
         field = vortex_ressource.readfield(name_fa)
         field = extract_domain(field, domain)
 
-        array = field.getdata()
-
         # store cumulative data
-        stored_data[domain][name_fa] = array
+        stored_data[domain][name_fa] = field
 
         if term != initial_term:
             # Conversion: - from mm to kg/m2/s for precip
             #              - from J/m2 to W/m2 for incoming LW and SW
-            array = (array - 0) / 3600 if term == 1 else (array - stored_data[domain][name_fa]) / 3600
-            array = np.maximum(0, array, dtype=np.float64)
-            return array
+            if term==1:
+                array = field.operation('/', 3600)
+            else:
+                field = field.operation('-', stored_data[domain][name_fa])
+                field = field.operation('/', 3600)
+            field = field.set_data(np.maximum(0, field.get_data(), dtype=np.float64))
+            return field
         else:
             # todo it's weird, we don't store cumulative data during initial term (Isabelle neither)
             # todo: Hugo, maybe there is a bug here in Isabelle code (or I didn't understand it)
@@ -209,7 +211,7 @@ def cumul_snow_graupel(vortex_ressource, name_fa_snow, name_fa_graupel, domain,
     graupel = cumul(vortex_ressource, name_fa_graupel, domain,
                     term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
 
-    return snow + graupel
+    return snow.operation('+', graupel)
 
 
 def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_sur, domain,
@@ -223,7 +225,7 @@ def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_
     surfrayt_dir_sur = cumul(vortex_ressource, name_fa_surfrayt_dir_sur, domain,
                              term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
 
-    return surfrayt_sola_de - surfrayt_dir_sur
+    return surfrayt_sola_de.operation('-', surfrayt_dir_sur)
 
 
 

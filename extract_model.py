@@ -106,10 +106,9 @@ try:
             vortex_ressource = get_vortex_ressource(date, term) # Load vortex file once then extract variables
             for name_variable_nc in variables_to_extract:
                 infos = dict_name_nc[name_variable_nc]
-                # type(hourly_array) == numpy array
-                hourly_array = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
+                field = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
                                          term=term, initial_term=initial_term, stored_data=stored_data)
-                add_hourly_array_to_netcdf(name_variable_nc, hourly_array)
+                add_hourly_field_to_netcdf(name_variable_nc, field)
         add_SURFEX_metadata_to_netcdf()
 except:
     send_a_mail_if_extraction_stopped()
