@@ -103,6 +103,9 @@ try:
     for idx_date, date in enumerate(dates):
         init_daily_netcdf_file()
         for idx_term, term in enumerate(terms):
+            # todo: for Hugo: I think we can "readfields" instead of "readfield", see in the doc,
+            #  meaning that we can access many variables at once... If we implement it we should modify our code
+            # http://www.umr-cnrm.fr/gmapdoc/meshtml/EPYGRAM1.4.3/_modules/epygram/base.html#Field
             vortex_ressource = get_vortex_ressource(date, term) # Load vortex file once then extract variables
             for name_variable_nc in variables_to_extract:
                 infos = dict_name_nc[name_variable_nc]

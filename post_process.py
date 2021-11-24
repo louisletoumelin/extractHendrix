@@ -167,7 +167,7 @@ def zs(vortex_ressource, name_fa, domain, term=None, inital_term=None, **kwargs)
         zs = extract_domain(zs, domain)
         zs.validity = epygram.base.FieldValidity()
         #todo verify that scalar_operation method (from epygram) works
-        return zs.scalar_operation('/', 9.81)
+        return zs / 9.81
 
 
 def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, stored_data=None, **kwargs):
@@ -186,10 +186,9 @@ def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, store
             # Conversion: - from mm to kg/m2/s for precip
             #              - from J/m2 to W/m2 for incoming LW and SW
             if term==1:
-                array = field.operation('/', 3600)
+                field = field / 3600
             else:
-                field = field.operation('-', stored_data[domain][name_fa])
-                field = field.operation('/', 3600)
+                field = (field - stored_data[domain][name_fa]) / 3600
             field = field.set_data(np.maximum(0, field.get_data(), dtype=np.float64))
             return field
         else:
@@ -211,7 +210,7 @@ def cumul_snow_graupel(vortex_ressource, name_fa_snow, name_fa_graupel, domain,
     graupel = cumul(vortex_ressource, name_fa_graupel, domain,
                     term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
 
-    return snow.operation('+', graupel)
+    return snow + graupel
 
 
 def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_sur, domain,
@@ -225,7 +224,7 @@ def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_
     surfrayt_dir_sur = cumul(vortex_ressource, name_fa_surfrayt_dir_sur, domain,
                              term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
 
-    return surfrayt_sola_de.operation('-', surfrayt_dir_sur)
+    return surfrayt_sola_de - surfrayt_dir_sur
 
 
 
