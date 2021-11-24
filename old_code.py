@@ -1,3 +1,8 @@
+"""
+copy past from Iabelle code (and some modifications such as deleting commentaries)
+"""
+
+
 !/usr/bin/env python
 # -*- coding: utf-8 -*-
 #-----------------------

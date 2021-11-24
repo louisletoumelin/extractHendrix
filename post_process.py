@@ -1,65 +1,52 @@
+"""
+Functions used to process each AROME variable
+"""
+# Global imports
 import numpy as np
 
+# Local imports
 import epygram
 
 
-def difference(vortexreader_readfield, var1, var2, *args):
-    #todo modify this function
-    vortexreader_readfield(var1).get_data() - vortexreader_readfield(var2).get_data()
-
-
-def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, stored_data=None, **kwargs):
-    if term > 0:
-        field = vortex_ressource.readfield(name_fa)
-        field = extract_domain(field, domain)
-
-        array = field.getdata()
-
-        # store cumulative data
-        stored_data[domain][name_fa] = array
-
-        if term != initial_term:
-            # Conversion: - from mm to kg/m2/s for precip
-            #              - from J/m2 to W/m2 for incoming LW and SW
-            array = (array - 0) / 3600 if term == 1 else (array - stored_data[domain][name_fa]) / 3600
-            array = np.maximum(0, array, dtype=np.float64)
-            return array
-        else:
-            # todo it's weird, we don't store cumulative data during initial term (Isabelle neither)
-            # todo: Hugo, maybe there is a bug here in Isabelle code (or I didn't understand it)
-            print("Term==initial term: no cumulative data (not sure about that)")
-    else:
-        print("Term==0: no cumulative data")
-
-
-def cumul_snow_graupel(vortex_ressource, name_fa_snow, name_fa_graupel, domain,
-                       term=None, initial_term=None, stored_data=None, **kwargs):
-    snow = cumul(vortex_ressource, name_fa_snow, domain,
-                 term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
-    graupel = cumul(vortex_ressource, name_fa_graupel, domain,
-                    term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
-
-    return snow + graupel
-
-
-def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_sur, domain,
-               term=None, initial_term=None, stored_data=None, **kwargs):
-
-    surfrayt_sola_de = cumul(vortex_ressource, name_fa_surfrayt_sola_de, domain,
-                             term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
-    surfrayt_dir_sur = cumul(vortex_ressource, name_fa_surfrayt_dir_sur, domain,
-                             term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
-
-    return surfrayt_sola_de - surfrayt_dir_sur
-
-
 def default(vortex_ressource, name_fa, domain, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
     field = vortex_ressource.readfield(name_fa)
     field = extract_domain(field, domain)
     return field.get_data()
 
 
 def _select_name_wind_gust(new_name_u, new_name_v, old_name_u, old_name_v, list_variables):
+    """
+    Select the appropriate wind gust name for FA files (because it changes with time)
+
+    Parameters
+    ----------
+    new_name_u : str
+        new name for wind gust (u component)
+    new_name_v : str
+        new name for wind gust (v component)
+    old_name_u : str
+        old name for wind gust (u component)
+    old_name_v : str
+        old name for wind gust (v component)
+    list_variables : list
+        list of all FA variables in vortex ressource
+
+    Returns
+    -------
+    u_name : str
+        name of wind gust variable in current vortex ressource (u component)
+    v_name : str
+        name of wind gust variable in current vortex ressource (v component)
+
+    Raises
+    ------
+    AttributeError
+        when no wind_gust name is found
+    """
     if (new_name_u in list_variables) and (new_name_v in list_variables):
         u_name = new_name_u
         v_name = new_name_v
@@ -102,7 +89,10 @@ def wind_gust(vortex_ressource, new_name_u, new_name_v, old_name_u, old_name_v, 
 
 
 def wind_speed_from_components(vortex_ressource, name_u, name_v, domain, **kwargs):
-
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
     u = vortex_ressource.readfield(name_u)
     v = vortex_ressource.readfield(name_v)
 
@@ -126,6 +116,10 @@ def wind_speed_from_components(vortex_ressource, name_u, name_v, domain, **kwarg
 
 
 def wind_direction_from_components(vortex_ressource, name_u, name_v, domain, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
     u = vortex_ressource.readfield(name_u)
     v = vortex_ressource.readfield(name_v)
 
@@ -148,14 +142,24 @@ def wind_direction_from_components(vortex_ressource, name_u, name_v, domain, **k
 
 
 def Psurf(vortex_ressource, name_fa, domain, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
     field = vortex_ressource.readfield(name_fa)
     field = extract_domain(field, domain)
     field = field.operation('exp')
     return field.get_data()
 
 
-def zs(vortex_ressource, name_fa, domain, term=None, **kwargs):
-    if term == 0:
+def zs(vortex_ressource, name_fa, domain, term=None, inital_term=None, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+
+    We only extract zs at a single term
+    """
+    if term == inital_term:
         zs = vortex_ressource.readfield(name_fa)
 
         if zs.spectral:
@@ -164,4 +168,62 @@ def zs(vortex_ressource, name_fa, domain, term=None, **kwargs):
         zs = extract_domain(zs, domain)
         zs.validity = epygram.base.FieldValidity()
         return zs.getdata() / 9.81
+
+
+def cumul(vortex_ressource, name_fa, domain, term=None, initial_term=None, stored_data=None, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
+    if term > 0:
+        field = vortex_ressource.readfield(name_fa)
+        field = extract_domain(field, domain)
+
+        array = field.getdata()
+
+        # store cumulative data
+        stored_data[domain][name_fa] = array
+
+        if term != initial_term:
+            # Conversion: - from mm to kg/m2/s for precip
+            #              - from J/m2 to W/m2 for incoming LW and SW
+            array = (array - 0) / 3600 if term == 1 else (array - stored_data[domain][name_fa]) / 3600
+            array = np.maximum(0, array, dtype=np.float64)
+            return array
+        else:
+            # todo it's weird, we don't store cumulative data during initial term (Isabelle neither)
+            # todo: Hugo, maybe there is a bug here in Isabelle code (or I didn't understand it)
+            print("Term==initial term: no cumulative data (not sure about that)")
+    else:
+        print("Term==0: no cumulative data")
+
+
+def cumul_snow_graupel(vortex_ressource, name_fa_snow, name_fa_graupel, domain,
+                       term=None, initial_term=None, stored_data=None, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
+    snow = cumul(vortex_ressource, name_fa_snow, domain,
+                 term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+    graupel = cumul(vortex_ressource, name_fa_graupel, domain,
+                    term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+
+    return snow + graupel
+
+
+def SCA_SWdown(vortex_ressource, name_fa_surfrayt_sola_de, name_fa_surfrayt_dir_sur, domain,
+               term=None, initial_term=None, stored_data=None, **kwargs):
+    """
+    Input: vortex ressource
+    Output: numpy array
+    """
+    surfrayt_sola_de = cumul(vortex_ressource, name_fa_surfrayt_sola_de, domain,
+                             term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+    surfrayt_dir_sur = cumul(vortex_ressource, name_fa_surfrayt_dir_sur, domain,
+                             term=term, initial_term=initial_term, stored_data=stored_data, **kwargs)
+
+    return surfrayt_sola_de - surfrayt_dir_sur
+
+
 
