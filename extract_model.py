@@ -8,7 +8,7 @@ from input_user import *
 from utils import *
 
 #todo implement "details" bellow, inspired from text in the AROME variable database (description of the variables)
-dict_name_nc  = {
+dict_name_nc = {
 
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],
@@ -93,7 +93,7 @@ check_if_files_are_already_downloaded_at_CEN()
 # extract simulation at ay -1 and between end_term-1 and end_term
 # first file is FORCING_day_alp_2020060206_2020060206.nc
 # next files are FORCING_day_alp_20200*0*07_20200*0*06.nc
-init_daily_netcdf_file()
+netcdf_resource = init_daily_netcdf_file()
 initial_vortex_ressource = get_vortex_ressource()
 for name_variable_nc in variables_to_extract:
     infos = dict_name_nc[name_variable_nc]
@@ -115,10 +115,14 @@ try:
             vortex_ressource = get_vortex_ressource(date, term) # Load vortex file once then extract variables
             # Maybe storing each fields in a dictionary is necessary?
             for name_variable_nc in variables_to_extract:
+
                 infos = dict_name_nc[name_variable_nc]
+
                 field = infos['compute'](vortex_ressource, *infos["fa_fields_required"], domain,
                                          term=term, initial_term=initial_term, stored_data=stored_data)
+
                 add_hourly_field_to_netcdf(name_variable_nc, field)
+
         add_SURFEX_metadata_to_netcdf()
 except:
     send_a_mail_if_extraction_stopped()

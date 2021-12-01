@@ -1,19 +1,17 @@
 """all codes related with netcdf goes here"""
+import epygram
 
 
-def init_daily_netcdf_file():
+def init_daily_netcdf_file(domain, date_begin, date_end):
     """Create and initialize the dimension of the netcdf file"""
-    #todo implement this function
-    forcing_file = 'FORCING_day_' + domain + '_' + date_beg.strftime("%Y%m%d%H") + '_' + date_end.strftime(
-        "%Y%m%d%H") + '.nc'
-    output_resource = epygram.formats.resource(forcing_file, 'w',
-                                               fmt='netCDF')  # on ouvre le netCDF de sortie en écriture
-    # et on lui dit quel comportement on veut qu'il adopte (du point de vue conventions netCDF)
+    forcing_file = 'FORCING_day_' + domain + '_' + date_begin.strftime("%Y_%m_%d_%H") + '__' + date_end.strftime("%Y_%m_%d_%H") + '.nc'
+    output_resource = epygram.formats.resource(forcing_file, 'w', fmt='netCDF')
     output_resource.behave(N_dimension='Number_of_points',
                            X_dimension='xx',
                            Y_dimension='yy',
                            force_a_T_dimension=True
                            )
+    return output_resource
 
 
 def add_hourly_field_to_netcdf():
