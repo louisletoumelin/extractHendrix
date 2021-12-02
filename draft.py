@@ -8,10 +8,6 @@ import xarray as xr
 import usevortex
 import epygram
 
-
-
-
-
 """
 Fonctions:
     - lecture d'un FA (un modèle, une date d'analyse, une date d'échéance, une sous-grille) et écriture dans un netcdf
@@ -129,8 +125,10 @@ def readDataFromCache(analysis_time, folder, model_name, stepmin, stepmax, varia
     }
     ou 6,7,8 sont les "steps"
     variable1, variable2 sont les éléments de la liste "variables".
+
+    Louis: je l'ai testé sur 3 steps et ça marche
     """
-    dict_variables = defaultdict(lambda: defaultdict(dict))
+    dict_data = defaultdict(lambda: defaultdict(dict))
     for step in range(stepmin-1, stepmax+1):
         # step-1 car on veut une heure avant le début pour les cumuls
         # step+1 car on veut que stepmax soit lu
@@ -138,29 +136,51 @@ def readDataFromCache(analysis_time, folder, model_name, stepmin, stepmax, varia
         nc_file = xr.open_dataset(filename)
         dict_from_xarray = nc_file.to_dict()
         for variable in variables:
-            dict_variables[str(step)][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
+            dict_data[step][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
 
-    return dict_variables
+    return dict_data
 
 # note: faire une classe serait vraiment bien ça permettrait de ne pas avoir à passer en argument folder, 
 # variables, model_name, analysis_time  à toutes les fonctions (avec les risques d'incohérences que ça comporte)
 
-def read_dict(data, variable, step):
+def read_dict(dict_data, variable, step):
     """
     sur le plan esthétique, mais je préfère appeler read(data, 'TEMPERATURE', 2)
     que data[2]['TEMPERATURE']
     et si on décide à l'avenir que notre façon de lire les données est pas terrible, il suffira de modifier cette fonction
+
+    Louis: j'ai testé et ça marche
     """
-    return data[step][variable]
+    return dict_data[step][variable]
 
 
 # note: la forme des fonctions compute souhaitée
-def compute_decumul_rain(data, term):
+def compute_decumul(dict_data, term, name_variable_FA):
     """
-    Calcule le décumul de rain pour l'échéance term
+    Calcule le décumul pour l'échéance term
     (on est obligé de mettre term dans les paramètres pour pouvoir gérer le cas des cumuls)
+
+    Louis: j'ai testé et ça marche
     """
-    return read_dict(data, 'NOM.VORTEX.RAIN', term) - read_dict(data, 'NOM.VORTEX.RAIN', term -1)
+    return read_dict(dict_data, name_variable_FA, term) - read_dict(dict_data, name_variable_FA, term -1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # reste l'écriture du netCDF final pas le temps de décrire mais ça devrait le faire
@@ -174,4 +194,5 @@ if __name__ == '__main__':
     analysis_time = datetime(2019, 5, 1, 0)
     variables = ['SURFTEMPERATURE', 'CLSTEMPERATURE']
     step = 1
-    epygram2netcdf(resource, folder, model_name, variables, analysis_time, step)
+    domain = "alps"
+    epygram2netcdf(resource, domain, folder, model_name, variables, analysis_time, step)
