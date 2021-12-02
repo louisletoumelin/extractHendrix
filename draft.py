@@ -1,5 +1,10 @@
 import os
-from datetime import datetime, timedelta 
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+import numpy as np
+import xarray as xr
+
 import usevortex
 import epygram
 
@@ -19,6 +24,7 @@ Fonctions:
     - les fonctions définies par l'utilisateur utilisent cette fonction pour lire les valeurs
 """
 
+
 def get_filename(folder, model_name, analysis_time, step):
     """
     On écrit les 24 fichiers netcdf temporaires dans des fichiers, avec une fonction qui donne
@@ -30,17 +36,16 @@ def get_filename(folder, model_name, analysis_time, step):
 
 # l'idée c'est de décrire le modèle, sans la date d'analyse, l'échéance et le nom du fichier, on les rajouter ensuite dans 
 model_description = dict(suite='oper',  # oper suite
-                            kind='historic',  # model state
+                         kind='historic',  # model state
                             # the initial date and time
-                            geometry='franmgsp',  # the name of the model domain
-                            cutoff='prod',  # type of cutoff // 'prod' vs 'assim'
-                            vapp='arome',  # type of application in operations namespace
-                            vconf='3dvarfr',  # name of config in operation namespace
-                            model='arome',  # name of the model, usually = vapp
-                            namespace='oper.archive.fr',
-                            block='forecast',
-                            experiment='oper')
-
+                         geometry='franmgsp',  # the name of the model domain
+                         cutoff='prod',  # type of cutoff // 'prod' vs 'assim'
+                         vapp='arome',  # type of application in operations namespace
+                         vconf='3dvarfr',  # name of config in operation namespace
+                         model='arome',  # name of the model, usually = vapp
+                         namespace='oper.archive.fr',
+                         block='forecast',
+                         experiment='oper')
 
 
 def get_resource_from_hendrix(folder, model_description, model_name, analysis_time, term):
@@ -55,9 +60,40 @@ def get_resource_from_hendrix(folder, model_description, model_name, analysis_ti
     return resource
 
 
+def extract_domain(field, domain):
+
+   """
+   Extract field over a specific area.
+   The indexes correspond to the AROME 1.3 km grid.
+   """
+
+   if domain =='alp':
+      first_i = 900
+      last_i = 1075
+      first_j = 525
+      last_j = 750
+   elif domain=='pyr':
+      first_i = 480
+      last_i = 785
+      first_j = 350
+      last_j = 475
+   elif domain=='test_alp':
+      first_i = 1090
+      last_i = 1100
+      first_j = 740
+      last_j = 750
+   elif domain=='jesus':
+       first_i=551
+       last_i=593
+       first_j=414
+       last_j=435
+
+   fld_zoom = field.extract_subarray(first_i, last_i,
+                        first_j, last_j)
+   return (fld_zoom)
 
 
-def epygram2netcdf(epygram_resource, folder, model_name, variables, analysis_time, step):
+def epygram2netcdf(epygram_resource, domain, folder, model_name, variables, analysis_time, step):
     """
     Fabrication des fichiers netcdf temporaires (1 par heure)
     folder: le dossier de destination (ça pourrait se factoriser en faisant une classe mais on va d'abord faire
@@ -75,13 +111,15 @@ def epygram2netcdf(epygram_resource, folder, model_name, variables, analysis_tim
                        )
     for variable in variables:
         field = epygram_resource.readfield(variable)
+        # Il vaut mieux extraire le domaine maintenant, comme ca on stocke des netcdf beaucoup plus petits
+        field = extract_domain(field, domain)
         field.fid['netCDF'] = field.fid['FA']
         if field.spectral:
             field.sp2gp()
         output_resource.writefield(field)
 
 
-def readDataFromCache(analysis_time, folder, model_name, variables, stepmin, stepmax):
+def readDataFromCache(analysis_time, folder, model_name, stepmin, stepmax, variables):
     """
     Lire dans le "cache" (le cache c'est le dossier ou on a placé tous nos netCDF), les netCDF pour en extraire les différentes variables dans un dictionnaire, de structure:
     {6: {variable1: tableau_numpy, variable2: tableau_numpy},
@@ -90,16 +128,24 @@ def readDataFromCache(analysis_time, folder, model_name, variables, stepmin, ste
     .........
     }
     ou 6,7,8 sont les "steps"
-    variable1, variable2 sont les éléments de la liste "variables"
+    variable1, variable2 sont les éléments de la liste "variables".
     """
-    data = {}
-    # TODO: ..........
-    return data
+    dict_variables = defaultdict(lambda: defaultdict(dict))
+    for step in range(stepmin-1, stepmax+1):
+        # step-1 car on veut une heure avant le début pour les cumuls
+        # step+1 car on veut que stepmax soit lu
+        filename = get_filename(folder, model_name, analysis_time, step)
+        nc_file = xr.open_dataset(filename)
+        dict_from_xarray = nc_file.to_dict()
+        for variable in variables:
+            dict_variables[str(step)][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
+
+    return dict_variables
 
 # note: faire une classe serait vraiment bien ça permettrait de ne pas avoir à passer en argument folder, 
 # variables, model_name, analysis_time  à toutes les fonctions (avec les risques d'incohérences que ça comporte)
 
-def read(data, variable, step):
+def read_dict(data, variable, step):
     """
     sur le plan esthétique, mais je préfère appeler read(data, 'TEMPERATURE', 2)
     que data[2]['TEMPERATURE']
@@ -109,34 +155,23 @@ def read(data, variable, step):
 
 
 # note: la forme des fonctions compute souhaitée
-def compute_decumul_rain(data, read, term):
+def compute_decumul_rain(data, term):
     """
     Calcule le décumul de rain pour l'échéance term
     (on est obligé de mettre term dans les paramètres pour pouvoir gérer le cas des cumuls)
     """
-    return read(data, 'NOM.VORTEX.RAIN', term) - read(data, 'NOM.VORTEX.RAIN', term -1)
+    return read_dict(data, 'NOM.VORTEX.RAIN', term) - read_dict(data, 'NOM.VORTEX.RAIN', term -1)
 
 
 # reste l'écriture du netCDF final pas le temps de décrire mais ça devrait le faire
-
-
-if __name__=='__main__':
+if __name__ == '__main__':
     # "tests"
-    resource = epygram.formats.resource(filename='/home/merzisenh/NO_SAVE/AROME/AROME_ana:2019-05-01-00h_step:0', getmode='epygram', openmode='r')
+    resource = epygram.formats.resource(filename='/home/merzisenh/NO_SAVE/AROME/AROME_ana:2019-05-01-00h_step:0',
+                                        getmode='epygram',
+                                        openmode='r')
     folder = '/home/merzisenh'
     model_name = 'AROME'
-    analysis_time  = datetime(2019,5,1,0)
-    variables = ['SURFTEMPERATURE','CLSTEMPERATURE']
+    analysis_time = datetime(2019, 5, 1, 0)
+    variables = ['SURFTEMPERATURE', 'CLSTEMPERATURE']
     step = 1
     epygram2netcdf(resource, folder, model_name, variables, analysis_time, step)
-
-
-
-
-
-
-
-
-
-
-

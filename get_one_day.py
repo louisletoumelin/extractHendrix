@@ -21,7 +21,7 @@ model_description = dict(suite='oper',  # oper suite
 
 analysis_time = datetime(2019, 5, 1, 0)
 
-for term in range(0,25):
+for term in range(0, 25):
     resource_description = dict(
             **model_description,
             local=os.path.join(
