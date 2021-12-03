@@ -4,4 +4,4 @@ rsync \
 	-av \
 	--exclude /.git/ \
 	--delete \
-	/home/hugo/Projets/extracthendrix/ merzisenh@sxcen.cnrm.meteo.fr:~/RSYNCED_CODES/extracthendrix/
+	/home/letoumelinl/extracthendrix/ letoumelinl@sxcen.cnrm.meteo.fr://cnrm/cen/users/NO_SAVE/letoumelinl/extractHendrix

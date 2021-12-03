@@ -26,21 +26,62 @@ Fonctions:
 
 
 def get_resource_from_hendrix(analysis_time, model_name, term, workdir=None):
-    config = configparser.ConfigParser()
-    config.read('models.ini')
-    model_description = dict(config[model_name])
     resource_description = dict(
-            **model_description,
-            date=analysis_time,
-            term=term,
-            local=os.path.join(workdir,'tmp_file.fa')
-            )
+        **get_model_description(model_name),
+        date=analysis_time,
+        term=term,
+        local=os.path.join(workdir, 'tmp_file.fa')
+    )
     resource = usevortex.get_resources(getmode='epygram', **resource_description)
     return resource
 
 
+def date_iterator(date_start, date_end):
+    """Return a generator containing a range of dates"""
+    current_date = date_start - timedelta(1)
+    while current_date < date_end:
+        current_date += timedelta(1)
+        yield current_date
 
-class HendrixConductor():
+
+def get_model_description(model_name):
+    config = configparser.ConfigParser()
+    config.read('models.ini')
+    return dict(config[model_name])
+
+
+def prepare_prestaging_demand(date_start, date_end, email_address, getter, terms,
+                              folder, model_name, domain, variables_nc):
+    """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
+    dates = date_iterator(date_start, date_end)
+
+    begin_str = date_start.strftime("%m/%d/%Y").replace('/', '_')
+    end_str = date_end.strftime("%m/%d/%Y").replace('/', '_')
+    mail_str = email_address.split("@")[0].replace('.', '_')
+
+    filename = f"request_prestaging_{mail_str}_{model_name}_begin_{begin_str}_end_{end_str}.txt"
+
+    with open(filename, "w+") as f:
+        f.write(f"#MAIL={email_address}\n")
+        for date in dates:
+            hc = HendrixConductor(getter, folder, model_name, date, domain, variables_nc)
+            for term in terms:
+                resource = hc.get_path_vortex_ressource(term)[0]
+                f.write(resource.split(':')[1] + "\n")
+
+    info_prestaging = "\n\nPlease find below the procedure for prestaging. \
+    Note a new file named 'request_prestaging_*.txt' has been created on your current folder\n\n1. \
+    Drop the file 'request_prestaging_*.txt' on Hendrix, in the folder DemandeMig/ChargeEnEspaceRapide \
+    \nYou can use FileZilla with your computer, or ftp for exemple.\n\n2. \
+    Rename the extension fo the file (once it is on Hendrix) with MIG\n\
+    'request_prestaging_*.txt'  => 'request_prestaging_.MIG'\n\n\
+    Note: don't rename in .MIG before dropping the file on Hendrix, or Hendrix could launch prestagging \
+    before the file is fully uploaded\n\n3. \
+    Please wait for an email from the Hendrix team to download your data\n\n"
+    print(info_prestaging)
+
+
+class HendrixConductor:
 
     def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc):
         self.folder = folder
@@ -49,7 +90,6 @@ class HendrixConductor():
                 str(uuid.uuid4())[:10]
                 )
         self.cache_folder = os.path.join(folder, hashcache)
-        os.mkdir(self.cache_folder)
         self.getter = getter
         self.model_name = model_name
         self.analysis_time = analysis_time
@@ -59,13 +99,12 @@ class HendrixConductor():
                 for key, value in transformations.items()
                 if key in variables_nc}
         self.variables_fa = self._get_fa_variables_names()
-    
+
     def process(self):
 
-        for term in range(1,12):
+        for term in range(1, 12):
             self._epygram2netcdf(term)
-        data = self.readDataFromCache(2,10)
-
+        data = self.readDataFromCache(2, 10)
 
     def _get_fa_variables_names(self):
         variables_fa = []
@@ -81,11 +120,12 @@ class HendrixConductor():
         analysis_time_str = self.analysis_time.strftime('%Y-%m-%d-%Hh')
         return os.path.join(self.cache_folder, "%s_ana_%s_term_%s.nc"%(self.model_name, analysis_time_str, term))
 
-
     def _epygram2netcdf(self, term):
         """
         Fabrication des fichiers netcdf temporaires (1 par échéance)
         """
+        if not os.path.exists(self.cache_folder):
+            os.mkdir(self.cache_folder)
         input_resource = self.getter(self.analysis_time, self.model_name, term, workdir=self.folder)
         output_resource = epygram.formats.resource(self._get_cache_filename(term), 'w', fmt='netCDF')
         # TODO: vérifier que c'est toujours ça qu'on veut
@@ -107,8 +147,11 @@ class HendrixConductor():
                     self.domain['first_j'],
                     self.domain['last_j']
                     )
+
             output_resource.writefield(field_domain)
 
+        with open(self.cache_folder + "times.txt", "a+") as t:
+            t.write(field.validity[0].getbasis().strftime("%m/%d/%Y"))
 
     def readDataFromCache(self, termmin, termmax):
         """
@@ -144,6 +187,14 @@ class HendrixConductor():
         Louis: j'ai testé et ça marche
         """
         return dict_data[term][variable]
+
+    def get_path_vortex_ressource(self, term):
+        resource_description = dict(
+                **get_model_description(self.model_name),
+                date=self.analysis_time,
+                term=term,
+                local='tmp_file.fa')
+        return usevortex.get_resources(getmode='locate', **resource_description)
 
 
 
