@@ -29,7 +29,6 @@ def concatenate_final_netcdf():
     # (Isabelle code crashes sometimes and concatenation is long)
     file_final = "FORCING_" + dd + '_' + date_beg.strftime("%Y%m%d%H") + "_" + date_end.strftime("%Y%m%d%H") + ".nc"
     callSystemOrDie("ncrcat -O FORCING_day_" + dd + "* " + file_final)
-
     pass
 
 
