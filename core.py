@@ -23,7 +23,7 @@ Fonctions:
     - fonction renvoyant la valeur d'une variable à un instant t depuis le "cache"
     - les fonctions définies par l'utilisateur utilisent cette fonction pour lire les valeurs
 """
-
+delta_terms = 1
 
 def get_resource_from_hendrix(analysis_time, model_name, term, workdir=None):
     resource_description = dict(
@@ -97,7 +97,7 @@ class HendrixConductor:
                 for key, value in transformations.items()
                 if key in variables_nc}
         self.cache_folder = self.generate_name_of_cache_folder()
-        self.variables_fa = self._get_fa_variables_names()
+        self.variables_fa = self.get_fa_variables_names()
 
     def generate_name_of_cache_folder(self):
         random_key = str(uuid.uuid4())[:10]
@@ -124,36 +124,44 @@ class HendrixConductor:
 
         return output_dict
 
-    def dict_to_netcdf(self, post_processed_data, start_term, end_term):
+    def generate_name_output_netcdf(self, start_term, end_term):
         str_analysis_time = self.analysis_time.strftime("%Y%m%d")
         str_time = str_analysis_time + f"_{start_term}h_to_" + str_analysis_time + f"_{end_term}h.nc"
-        filename_nc = f"{self.model_name}_" + str_time
-        output_dir = os.path.join(self.folder, filename_nc)
-        xr.Dataset.from_dict(post_processed_data).to_netcdf(output_dir)
+        return f"{self.model_name}_" + str_time
 
-    def process(self, start_term, end_term, **kwargs):
+    def dict_to_netcdf(self, post_processed_data, start_term, end_term):
 
-        for term in range(start_term, end_term):
+        filename_nc = self.generate_name_output_netcdf(start_term, end_term)
+        dataset = xr.Dataset.from_dict(post_processed_data)
+
+        # Create a time variable
+        time = self.open_times_fa_in_txt_file()
+        dataset["time"] = (('time'), time[1:])
+        dataset.to_netcdf(os.path.join(self.folder, filename_nc))
+
+    def process_daily(self, start_term, end_term, **kwargs):
+
+        for term in range(start_term-1, end_term+1):
             self._epygram2netcdf(term)
 
-        dict_data = self.readDataFromCache(start_term, end_term, 1)
+        dict_data = self.readDataFromCache(start_term, end_term)
 
         post_processed_data = defaultdict(lambda: defaultdict(list))
 
-        for term in range(start_term+1, end_term):
+        for term in range(start_term, end_term+1):
             post_processed_data = self.post_process(dict_data, post_processed_data, term, **kwargs)
 
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
 
         return post_processed_data
 
-    def _get_fa_variables_names(self):
+    def get_fa_variables_names(self):
         variables_fa = []
         for value in self.transformations.values():
             variables_fa.extend(value["fa_fields_required"])
         return list(set(variables_fa))
 
-    def _get_cache_filename(self, term):
+    def get_netcdf_in_cache_filename(self, term):
         """
         On écrit les 24 fichiers netcdf temporaires dans des fichiers, avec une fonction qui donne
         leur nom c'est beaucoup plus facile de les écrire et de les récupérer
@@ -191,6 +199,14 @@ class HendrixConductor:
             time_in_fa_file = field.validity[0].get()
             t.write(time_in_fa_file.strftime("%Y/%m/%d_%H:%M:%S")+"\n")
 
+    def open_times_fa_in_txt_file(self):
+        with open(os.path.join(self.cache_folder, "times.txt"), "r") as t:
+            list_times = []
+            for line in t:
+                time = datetime.strptime(line[:-1], "%Y/%m/%d_%H:%M:%S")
+                list_times.append(np.datetime64(time))
+        return np.array(list_times)
+
     @staticmethod
     def read_epygram_field(input_resource, variable):
         initial_name = variable
@@ -226,7 +242,7 @@ class HendrixConductor:
         """
         self.create_cache_folder_if_doesnt_exist()
         input_resource = self.getter(self.analysis_time, self.model_name, term, workdir=self.folder)
-        output_resource = epygram.formats.resource(self._get_cache_filename(term), 'w', fmt='netCDF')
+        output_resource = epygram.formats.resource(self.get_netcdf_in_cache_filename(term), 'w', fmt='netCDF')
         # TODO: vérifier que c'est toujours ça qu'on veut
         # (par exemple la dimension 'Number_of_points' peut-être pas nécessaire pour Arome
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
@@ -239,7 +255,7 @@ class HendrixConductor:
 
         self.write_time_fa_in_txt_file(field)
 
-    def readDataFromCache(self, term_min, term_max):
+    def readDataFromCache(self, start_term, end_term):
         """
         Lire dans le "cache" (le cache c'est le dossier ou on a placé tous nos netCDF), les netCDF pour en extraire les différentes variables dans un dictionnaire, de structure:
         {6: {variable1: tableau_numpy, variable2: tableau_numpy},
@@ -251,8 +267,8 @@ class HendrixConductor:
         variable1, variable2 sont les éléments de la liste "variables".
         """
         dict_data = defaultdict(lambda: defaultdict(dict))
-        for term in range(term_min, term_max):
-            filename = self._get_cache_filename(term)
+        for term in range(start_term-1, end_term+1):
+            filename = self.get_netcdf_in_cache_filename(term)
             nc_file = xr.open_dataset(filename)
             dict_from_xarray = nc_file.to_dict()
             for variable in self.variables_fa:
