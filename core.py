@@ -103,6 +103,7 @@ def get_year_between_dates(start, end):
         mlist.append(datetime(y, m+1, 1).year)
     return list(set(mlist))
 
+
 def get_model_description(model_name):
     config = configparser.ConfigParser()
     config.read('models.ini')
@@ -139,6 +140,47 @@ def prepare_prestaging_demand(date_start, date_end, email_address, getter, terms
     before the file is fully uploaded\n\n3. \
     Please wait for an email from the Hendrix team to download your data\n\n"
     print(info_prestaging)
+
+
+def concatenate_netcdf(type_concatenation, list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
+    if type_concatenation == "month":
+        concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
+    elif type_concatenation == "year":
+        concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
+
+
+def concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
+    dataset = xr.open_mfdataset([os.path.join(folder, file) for file in list_daily_netcdf_files])
+
+    list_years_months = get_year_and_month_between_dates(date_start, date_end)
+
+    for (year, month) in list_years_months:
+        condition_month = dataset["time.month"] == month
+        condition_year = dataset["time.year"] == year
+        filename = os.path.join(folder, f"{model_name}_{domain}_{year}_{month}.nc")
+        dataset.where(condition_month & condition_year, drop=True).to_netcdf(filename)
+
+
+def concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
+    dataset = xr.open_mfdataset([os.path.join(folder, file) for file in list_daily_netcdf_files])
+
+    list_years = get_year_between_dates(date_start, date_end)
+
+    for year in list_years:
+        condition_year = dataset["time.year"] == year
+        filename = os.path.join(folder, f"{model_name}_{domain}_{year}.nc")
+        dataset.where(condition_year, drop=True).to_netcdf(filename)
+
+
+def download(date_start, date_end, getter, folder, model_name, domain, variables_nc, start_term, end_term, type_concatenation):
+    dates = date_iterator(date_start, date_end)
+    names_netcdf = []
+    for date in dates:
+        print(date)
+        hc = HendrixConductor(getter, folder, model_name, date, domain, variables_nc)
+        hc.download_daily_netcdf(start_term, end_term)
+        names_netcdf.append(hc.generate_name_output_netcdf(start_term, end_term))
+    concatenate_netcdf(type_concatenation, names_netcdf, model_name, domain, folder, date_start, date_end)
 
 
 class HendrixConductor:
@@ -368,6 +410,7 @@ class HendrixConductor:
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()
+
 
 """
 # reste l'écriture du netCDF final pas le temps de décrire mais ça devrait le faire
