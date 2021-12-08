@@ -175,10 +175,14 @@ def concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, fold
 def download(date_start, date_end, getter, folder, model_name, domain, variables_nc, start_term, end_term, type_concatenation):
     dates = date_iterator(date_start, date_end)
     names_netcdf = []
+
+    hc = HendrixConductor(getter, folder, model_name, date_start, domain, variables_nc)
+    hc.download_daily_netcdf(start_term, start_term)
+
     for date in dates:
         print(date)
         hc = HendrixConductor(getter, folder, model_name, date, domain, variables_nc)
-        hc.download_daily_netcdf(start_term, end_term)
+        hc.download_daily_netcdf(start_term+1, end_term)
         names_netcdf.append(hc.generate_name_output_netcdf(start_term, end_term))
     concatenate_netcdf(type_concatenation, names_netcdf, model_name, domain, folder, date_start, date_end)
 
