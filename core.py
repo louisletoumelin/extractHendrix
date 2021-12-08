@@ -134,9 +134,12 @@ class HendrixConductor:
         return os.path.join(self.folder, f"{self.model_name}_" + hashcache)
 
     def generate_name_output_netcdf(self, start_term, end_term):
-        str_analysis_time = self.analysis_time.strftime("%Y%m%d")
-        str_time = str_analysis_time + f"_{start_term}h_to_" + str_analysis_time + f"_{end_term}h.nc"
-        return f"{self.model_name}_" + str_time
+        start_time = self.analysis_time + timedelta(hours=start_term)
+        end_time = self.analysis_time + timedelta(hours=end_term)
+        start_time = start_time.strftime("%Y%m%d_%Hh")
+        end_time = end_time.strftime("%Y%m%d_%Hh")
+        str_time = f"{start_time}_to_{end_time}"
+        return f"{self.model_name}_{str_time}.nc"
 
     def get_compute_function(self, variable_nc):
         name_compute_function = self.transformations[variable_nc]['compute']
