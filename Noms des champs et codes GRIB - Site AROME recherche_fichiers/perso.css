@@ -1,0 +1,5 @@
+a {text-decoration: underline;}
+h3.spip {color:orange;}
+h4.spip {color:orange;}
+table.spip {font-size: 0.9em} /* nécessaire car la définition de font-size dans body n'est pas héritée par table si le DOCTYPE n'est pas à strict ou transitional avec "http://www.w3.org/TR/html4/loose.dtd". (Cf. http://bytes.com/topic/html-css/answers/548411-table-cell-font-size-not-influenced-body-style ).*/
+#page {width: 70em;}
