@@ -147,6 +147,8 @@ def concatenate_netcdf(type_concatenation, list_daily_netcdf_files, model_name, 
         concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
     elif type_concatenation == "year":
         concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
+    elif type_concatenation == "all":
+        concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
 
 
 def concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
@@ -170,6 +172,14 @@ def concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, fold
         condition_year = dataset["time.year"] == year
         filename = os.path.join(folder, f"{model_name}_{domain}_{year}.nc")
         dataset.where(condition_year, drop=True).to_netcdf(filename)
+
+
+def concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
+    dataset = xr.open_mfdataset([os.path.join(folder, file) for file in list_daily_netcdf_files])
+    start_str = date_start.strftime('%Y%m%d_%Hh')
+    end_str = date_end.strftime('%Y%m%d_%Hh')
+    filename = os.path.join(folder, f"{model_name}_{domain}_from_{start_str}_to_{end_str}.nc")
+    dataset.to_netcdf(filename)
 
 
 def download(date_start, date_end, getter, folder, model_name, domain, variables_nc, start_term, end_term, type_concatenation):
