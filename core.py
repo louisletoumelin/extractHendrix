@@ -176,7 +176,7 @@ class HendrixConductor:
         shutil.rmtree(self.cache_folder, ignore_errors=True)
 
     def delete_temporary_fa_file(self):
-        os.remove(os.path.join(self.cache_folder, 'tmp_file.fa'))
+        os.remove(os.path.join(self.folder, 'tmp_file.fa'))
 
     @staticmethod
     def transform_spectral_field_if_required(field):
