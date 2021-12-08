@@ -1,14 +1,16 @@
 import numpy as np
 
+# http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25
 transformations = {
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],#CLSTEMPERATURE
+                        grib_field_required=['CLSTEMPERATURE'],
                         compute="compute_decumul",
-                        details="Diagnostic temperature"),
+                        details_original_field="2 m Temperature"),
                'T1':
                    dict(fa_fields_required=['S090TEMPERATURE'],
                         compute=None,
-                        details="Prognostic lowest level temperature"),
+                        details_original_field="Prognostic lowest level temperature"),
 
                # todo 1/3: Isabelle used the prognostic humidity and stored it in Qair. Now prognostic humidity is Q1. We
                # 2/3: should create a function that put the values of Q1 inside Qair when the user desires
@@ -16,26 +18,29 @@ transformations = {
                'Qair':
                    dict(fa_fields_required=['CLSHUMI.SPECIFIQ'],
                         compute=None,
-                        details="Diagnostic specifiq humidity at 2m a.g.l."),
+                        details_original_field="2m specific humidity"),
 
                'Q1':
                    dict(fa_fields_required=['S090HUMI.SPECIFI'],
                         compute=None,
-                        details="Prognostic specific humidity at the lowest vertical level in the model"),
+                        details_original_field="Specific moisture"),
 
                'ts':
                    dict(fa_fields_required=['SURFTEMPERATURE'],
-                        compute=None),
+                        compute=None,
+                        details_original_field="Ts (the one used in radiation)"),
 
                'Wind':
                    dict(fa_fields_required=['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
-                        compute="compute_wind_speed"),
+                        compute="compute_wind_speed",
+                        details_original_field="10 m wind"),
+
 
                'Wind_Gust':
                    # Wind gust name has changed few years ago
                    dict(fa_fields_required=['CLSU.RAF60M.XFU', 'CLSV.RAF60M.XFU'],
                         compute="compute_wind_speed",
-                        details="Wind gust has alternative names"),
+                        details="U and V 10m wind gusts (max since last file)"),
 
                'Wind_DIR':
                    dict(fa_fields_required =['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
@@ -44,12 +49,12 @@ transformations = {
                'PSurf':
                    dict(fa_fields_required=['SURFPRESSION'],
                         compute="compute_psurf",
-                        details="Surface pressure"),
+                        details_original_field="Surface pressure"),
 
                'ZS':
                    dict(fa_fields_required=['SPECSURFGEOPOTEN'],
                         compute="compute_zs",
-                        details="Surface elevation. "
+                        details_original_field="Surface elevation. "
                                 "This variable is added once to the netcdf: during the first forecast term"),
 
                'Rainf':
@@ -71,12 +76,12 @@ transformations = {
                'Snowf':
                     dict(fa_fields_required=['SURFACCNEIGE', 'SURFACCGRAUPEL'],
                          compute="compute_snowfall",
-                         detail="Snowfall = snow + graupel"),
+                         details_original_field="Snowfall = Cumulative snow + graupel"),
 
                'SCA_SWdown':
                    dict(fa_fields_required=['SURFRAYT SOLA DE', 'SURFRAYT DIR SUR'],
-                        compute="compute_SCA_SWdown"),
-
+                        compute="compute_SCA_SWdown",
+                        details_original_field="SURFRAYT SOLA DE = Cum. Downward solarflux at surface"),
                }
 
 alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],

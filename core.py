@@ -141,6 +141,8 @@ def prepare_prestaging_demand(date_start, date_end, email_address, getter, terms
     Please wait for an email from the Hendrix team to download your data\n\n"
     print(info_prestaging)
 
+    send_link_to_hendrix_documentation()
+
 
 def concatenate_netcdf(type_concatenation, list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
     if type_concatenation == "month":
@@ -149,6 +151,32 @@ def concatenate_netcdf(type_concatenation, list_daily_netcdf_files, model_name, 
         concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
     elif type_concatenation == "all":
         concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
+
+
+def help():
+    send_link_to_hendrix_documentation()
+    print("\n\n")
+    send_link_to_confluence_table_with_downloaded_data()
+    print("\n\n")
+    send_link_to_AROME_variables()
+
+
+def send_link_to_hendrix_documentation():
+    print("The documentation of the storage system Hendrix is available here:")
+    print("http://confluence.meteo.fr/pages/viewpage.action?pageId=299881305")
+
+
+def send_link_to_confluence_table_with_downloaded_data():
+    link = "http: // confluence.meteo.fr / pages / viewpage.action?pageId = 314552092"
+    print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
+    print("Please see the link below")
+    print(link)
+
+
+def send_link_to_AROME_variables():
+    link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
+    print("Website with all AROME variables (might be outdated")
+    print(link)
 
 
 def concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
@@ -183,6 +211,9 @@ def concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, 
 
 
 def download(date_start, date_end, getter, folder, model_name, domain, variables_nc, start_term, end_term, type_concatenation):
+
+    send_link_to_confluence_table_with_downloaded_data()
+
     dates = date_iterator(date_start, date_end)
     names_netcdf = []
 
