@@ -28,7 +28,7 @@ Fonctions:
 delta_terms = 1
 
 
-def _get_ressources_vortex(resource_description):
+def _get_resources_vortex(resource_description):
     i = 0
     while i < 10:
         try:
@@ -60,7 +60,7 @@ def get_resource_from_hendrix(analysis_time, model_name, term, workdir=None):
         local=os.path.join(workdir, 'tmp_file.fa')
     )
 
-    resource = _get_ressources_vortex(resource_description)
+    resource = _get_resources_vortex(resource_description)
     resource = resource[0] if isinstance(resource, list) else resource
 
     return resource
@@ -90,6 +90,7 @@ def prepare_prestaging_demand(date_start, date_end, email_address, getter, terms
     mail_str = email_address.split("@")[0].replace('.', '_')
 
     filename = f"request_prestaging_{mail_str}_{model_name}_begin_{begin_str}_end_{end_str}.txt"
+    filename = os.path.join(folder, filename)
 
     with open(filename, "w+") as f:
         f.write(f"#MAIL={email_address}\n")
