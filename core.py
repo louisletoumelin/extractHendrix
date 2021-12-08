@@ -131,7 +131,7 @@ class HendrixConductor:
         random_key = str(uuid.uuid4())[:10]
         hashcache = "%s-%s" % (self.analysis_time.strftime('%Y-%m-%d_%H'), random_key)
 
-        return os.path.join(self.folder, str(self.model_name) + hashcache)
+        return os.path.join(self.folder, f"{self.model_name}_" + hashcache)
 
     def generate_name_output_netcdf(self, start_term, end_term):
         str_analysis_time = self.analysis_time.strftime("%Y%m%d")
