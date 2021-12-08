@@ -178,6 +178,7 @@ def download(date_start, date_end, getter, folder, model_name, domain, variables
 
     hc = HendrixConductor(getter, folder, model_name, date_start, domain, variables_nc)
     hc.download_daily_netcdf(start_term, start_term)
+    names_netcdf.append(hc.generate_name_output_netcdf(start_term, start_term))
 
     for date in dates:
         print(date)
