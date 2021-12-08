@@ -74,6 +74,35 @@ def date_iterator(date_start, date_end):
         yield current_date
 
 
+def get_year_and_month_between_dates(start, end):
+    """
+    date_start = datetime(2019, 5, 1, 0)
+    date_end = datetime(2020, 12, 3, 0)
+    get_year_and_month_between_dates(date_start, date_end)
+    # returns [(2019, 5), (2019, 6), (2019, 7), (2019, 8), (2019, 9), (2019, 10)]
+    """
+    total_months = lambda dt: dt.month + 12 * dt.year
+    mlist = []
+    for tot_m in range(total_months(start)-1, total_months(end)):
+        y, m = divmod(tot_m, 12)
+        mlist.append((datetime(y, m+1, 1).year, datetime(y, m+1, 1).month))
+    return mlist
+
+
+def get_year_between_dates(start, end):
+    """
+    date_start = datetime(2019, 5, 1, 0)
+    date_end = datetime(2020, 12, 3, 0)
+    get_year_and_month_between_dates(date_start, date_end)
+    # returns [2019]
+    """
+    total_months = lambda dt: dt.month + 12 * dt.year
+    mlist = []
+    for tot_m in range(total_months(start)-1, total_months(end)):
+        y, m = divmod(tot_m, 12)
+        mlist.append(datetime(y, m+1, 1).year)
+    return list(set(mlist))
+
 def get_model_description(model_name):
     config = configparser.ConfigParser()
     config.read('models.ini')
