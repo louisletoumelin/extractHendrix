@@ -110,6 +110,22 @@ def get_model_description(model_name):
     return dict(config[model_name])
 
 
+def latlon2ij(ll_lat, ll_lon, ur_lat, ur_lon, analysis_time, model_name, folder, term=5):
+    """
+    Input:
+    ll_lat, ll_lon: lat and lon of lower left corner (ll)
+    ur_lat, ur_lon: lat and lon of upper right corner (ur)
+
+    Return:
+    first_i, last_i, first_j, last_j
+    """
+    resource = get_resource_from_hendrix(analysis_time, model_name, term, workdir=folder)
+    field = resource.readfield('CLSTEMPERATURE')
+    x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
+    x2, y2 = np.round(field.geometry.ll2ij(ur_lon, ur_lat)) + 1
+    return x1, x2, y1, y2
+
+
 def prepare_prestaging_demand(date_start, date_end, email_address, getter, terms,
                               folder, model_name, domain, variables_nc):
     """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
@@ -456,22 +472,6 @@ class HendrixConductor:
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()
-
-    def latlon2ij(self, ll_lat, ll_lon, ur_lat, ur_lon, analysis_time, model_name, folder, term=5):
-        """
-        Input:
-        ll_lat, ll_lon: lat and lon of lower left corner (ll)
-        ur_lat, ur_lon: lat and lon of upper right corner (ur)
-
-        Return:
-        first_i, last_i, first_j, last_j
-        """
-        resource = get_resource_from_hendrix(analysis_time, model_name, term, workdir=folder)
-        field = resource.readfield('CLSTEMPERATURE')
-        x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
-        x2, y2 = np.round(field.geometry.ll2ij(ur_lon, ur_lat)) + 1
-        return x1, x2, y1, y2
-
 
 """
 # reste l'écriture du netCDF final pas le temps de décrire mais ça devrait le faire
