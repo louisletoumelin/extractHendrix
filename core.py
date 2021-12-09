@@ -28,221 +28,193 @@ Fonctions:
 delta_terms = 1
 
 
-def _get_resources_vortex(resource_description):
-    i = 0
-    while i < 10:
-        try:
-            return usevortex.get_resources(getmode='epygram', **resource_description)
-        except Exception as e:
-            print("An exception has occured when using usevortex.get_resources command")
-            print(f"The exception raised is: {e}")
-            print("Exception at this stage can occur if Hendrix server is not accessible")
-            if i < 5:
-                thirty_minutes = 30 * 60
-                print("We will try accessing the resource again in 30 minutes")
-                print("Number of tries allowed: 10")
-                time.sleep(thirty_minutes)
-                i += 1
-            elif 5 <= i < 9:
-                print("We will try accessing the resource again in 1h")
-                one_hour = 3600
-                time.sleep(one_hour)
-                i += 1
-            else:
-                raise
-
-
-def get_resource_from_hendrix(analysis_time, model_name, term, workdir=None):
-    resource_description = dict(
-        **get_model_description(model_name),
-        date=analysis_time,
-        term=term,
-        local=os.path.join(workdir, 'tmp_file.fa')
-    )
-
-    resource = _get_resources_vortex(resource_description)
-    resource = resource[0] if isinstance(resource, list) else resource
-
-    return resource
-
-
-def date_iterator(date_start, date_end):
-    """Return a generator containing a range of dates"""
-    current_date = date_start - timedelta(1)
-    while current_date < date_end:
-        current_date += timedelta(1)
-        yield current_date
-
-
-def get_year_and_month_between_dates(start, end):
-    """
-    date_start = datetime(2019, 5, 1, 0)
-    date_end = datetime(2020, 12, 3, 0)
-    get_year_and_month_between_dates(date_start, date_end)
-    # returns [(2019, 5), (2019, 6), (2019, 7), (2019, 8), (2019, 9), (2019, 10)]
-    """
-    total_months = lambda dt: dt.month + 12 * dt.year
-    mlist = []
-    for tot_m in range(total_months(start)-1, total_months(end)):
-        y, m = divmod(tot_m, 12)
-        mlist.append((datetime(y, m+1, 1).year, datetime(y, m+1, 1).month))
-    return mlist
-
-
-def get_year_between_dates(start, end):
-    """
-    date_start = datetime(2019, 5, 1, 0)
-    date_end = datetime(2020, 12, 3, 0)
-    get_year_and_month_between_dates(date_start, date_end)
-    # returns [2019]
-    """
-    total_months = lambda dt: dt.month + 12 * dt.year
-    mlist = []
-    for tot_m in range(total_months(start)-1, total_months(end)):
-        y, m = divmod(tot_m, 12)
-        mlist.append(datetime(y, m+1, 1).year)
-    return list(set(mlist))
-
-
 def get_model_description(model_name):
+    # todo give the path to models.ini
     config = configparser.ConfigParser()
     config.read('models.ini')
     return dict(config[model_name])
 
 
-def latlon2ij(ll_lat, ll_lon, ur_lat, ur_lon, analysis_time, model_name, folder, term=5):
-    """
-    Input:
-    ll_lat, ll_lon: lat and lon of lower left corner (ll)
-    ur_lat, ur_lon: lat and lon of upper right corner (ur)
+class Extractor:
 
-    Return:
-    first_i, last_i, first_j, last_j
-    """
-    resource = get_resource_from_hendrix(analysis_time, model_name, term, workdir=folder)
-    field = resource.readfield('CLSTEMPERATURE')
-    x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
-    x2, y2 = np.round(field.geometry.ll2ij(ur_lon, ur_lat)) + 1
-    return x1, x2, y1, y2
+    def __init__(self, config_user):
+        self.getter = config_user.get("getter")
+        self.folder = config_user.get("folder")
+        self.model_name = config_user.get("model_name")
+        self.analysis_time = config_user.get("analysis_time")
+        self.domain = config_user.get("domain")
+        self.variables_nc = config_user.get("variables_nc")
+        self.date_start = config_user.get("date_start")
+        self.date_end = config_user.get("date_end")
+        self.email_adress = config_user.get("email_address")
+        self.start_term = config_user.get("start_term")
+        self.end_term = config_user.get("end_term")
+        self.final_concatenation = config_user.get("final_concatenation")
 
+    @staticmethod
+    def date_iterator(date_start, date_end):
+        """Return a generator containing a range of dates"""
+        current_date = date_start - timedelta(1)
+        while current_date < date_end:
+            current_date += timedelta(1)
+            yield current_date
 
-def prepare_prestaging_demand(date_start, date_end, email_address, getter, terms,
-                              folder, model_name, domain, variables_nc):
-    """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
-    dates = date_iterator(date_start, date_end)
+    @staticmethod
+    def get_year_and_month_between_dates(start, end):
+        """
+        date_start = datetime(2019, 5, 1, 0)
+        date_end = datetime(2020, 12, 3, 0)
+        get_year_and_month_between_dates(date_start, date_end)
+        # returns [(2019, 5), (2019, 6), (2019, 7), (2019, 8), (2019, 9), (2019, 10)]
+        """
+        total_months = lambda dt: dt.month + 12 * dt.year
+        mlist = []
+        for tot_m in range(total_months(start)-1, total_months(end)):
+            y, m = divmod(tot_m, 12)
+            mlist.append((datetime(y, m+1, 1).year, datetime(y, m+1, 1).month))
+        return mlist
 
-    begin_str = date_start.strftime("%m/%d/%Y").replace('/', '_')
-    end_str = date_end.strftime("%m/%d/%Y").replace('/', '_')
-    mail_str = email_address.split("@")[0].replace('.', '_')
+    @staticmethod
+    def get_year_between_dates(start, end):
+        """
+        date_start = datetime(2019, 5, 1, 0)
+        date_end = datetime(2020, 12, 3, 0)
+        get_year_and_month_between_dates(date_start, date_end)
+        # returns [2019]
+        """
+        total_months = lambda dt: dt.month + 12 * dt.year
+        mlist = []
+        for tot_m in range(total_months(start)-1, total_months(end)):
+            y, m = divmod(tot_m, 12)
+            mlist.append(datetime(y, m+1, 1).year)
+        return list(set(mlist))
 
-    filename = f"request_prestaging_{mail_str}_{model_name}_begin_{begin_str}_end_{end_str}.txt"
-    filename = os.path.join(folder, filename)
+    def get_documentation(self):
+        self.send_link_to_hendrix_documentation()
+        print("\n\n")
+        self.send_link_to_confluence_table_with_downloaded_data()
+        print("\n\n")
+        self.send_link_to_AROME_variables()
 
-    with open(filename, "w+") as f:
-        f.write(f"#MAIL={email_address}\n")
+    def latlon2ij(self, ll_lat, ll_lon, ur_lat, ur_lon, term=5):
+        """
+        Input:
+        ll_lat, ll_lon: lat and lon of lower left corner (ll)
+        ur_lat, ur_lon: lat and lon of upper right corner (ur)
+
+        Return:
+        first_i, last_i, first_j, last_j
+        """
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc)
+        resource = hc.get_resource_from_hendrix(term)
+        field = resource.readfield('CLSTEMPERATURE')
+        x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
+        x2, y2 = np.round(field.geometry.ll2ij(ur_lon, ur_lat)) + 1
+        return x1, x2, y1, y2
+
+    @staticmethod
+    def send_link_to_hendrix_documentation():
+        print("The documentation of the storage system Hendrix is available here:")
+        print("http://confluence.meteo.fr/pages/viewpage.action?pageId=299881305")
+
+    @staticmethod
+    def send_link_to_confluence_table_with_downloaded_data():
+        link = "http: // confluence.meteo.fr / pages / viewpage.action?pageId = 314552092"
+        print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
+        print("Please see the link below")
+        print(link)
+
+    @staticmethod
+    def send_link_to_AROME_variables():
+        link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
+        print("Website with all AROME variables (might be outdated")
+        print(link)
+
+    def concatenate_netcdf(self, list_daily_netcdf_files):
+        if self.final_concatenation == "month":
+            self._concatenate_netcdf_by_year_and_month(list_daily_netcdf_files)
+        elif self.final_concatenation == "year":
+            self._concatenate_netcdf_by_year(list_daily_netcdf_files)
+        elif self.final_concatenation == "all":
+            self._concatenate_all_netcdf(list_daily_netcdf_files)
+
+    def _concatenate_netcdf_by_year_and_month(self, list_daily_netcdf_files):
+        dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+
+        list_years_months = self.get_year_and_month_between_dates(self.date_start, self.date_end)
+
+        for (year, month) in list_years_months:
+            condition_month = dataset["time.month"] == month
+            condition_year = dataset["time.year"] == year
+            filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}_{month}.nc")
+            dataset.where(condition_month & condition_year, drop=True).to_netcdf(filename)
+
+    def _concatenate_netcdf_by_year(self, list_daily_netcdf_files):
+        dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+
+        list_years = self.get_year_between_dates(self.date_start, self.date_end)
+
+        for year in list_years:
+            condition_year = dataset["time.year"] == year
+            filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}.nc")
+            dataset.where(condition_year, drop=True).to_netcdf(filename)
+
+    def _concatenate_all_netcdf(self, list_daily_netcdf_files):
+        dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+        start_str = self.date_start.strftime('%Y%m%d_%Hh')
+        end_str = self.date_end.strftime('%Y%m%d_%Hh')
+        filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_from_{start_str}_to_{end_str}.nc")
+        dataset.to_netcdf(filename)
+
+    def prepare_prestaging_demand(self):
+        """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
+        dates = self.date_iterator(self.date_start, self.date_end)
+
+        begin_str = self.date_start.strftime("%m/%d/%Y").replace('/', '_')
+        end_str = self.date_end.strftime("%m/%d/%Y").replace('/', '_')
+        mail_str = self.email_address.split("@")[0].replace('.', '_')
+
+        filename = f"request_prestaging_{mail_str}_{self.model_name}_begin_{begin_str}_end_{end_str}.txt"
+        filename = os.path.join(self.folder, filename)
+
+        with open(filename, "w+") as f:
+            f.write(f"#MAIL={self.email_address}\n")
+            for date in dates:
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
+                for term in range(self.start_term, self.end_term):
+                    resource = hc.get_path_vortex_ressource(term)[0]
+                    f.write(resource.split(':')[1] + "\n")
+
+        info_prestaging = "\n\nPlease find below the procedure for prestaging. \
+        Note a new file named 'request_prestaging_*.txt' has been created on your current folder\n\n1. \
+        Drop this file on Hendrix, in the folder DemandeMig/ChargeEnEspaceRapide \
+        \nYou can use FileZilla with your computer, or ftp to drop the file.\n\n2. \
+        Rename the extension of the file '.txt' (once it is on Hendrix) with '.MIG'\n\
+        'request_prestaging_*.txt'  => 'request_prestaging_.MIG'\n\n\
+        Note: don't rename in '.MIG' before dropping the file on Hendrix, or Hendrix could launch prestaging\
+        before the file is fully uploaded\n\n3. \
+        Please wait for an email from the Hendrix team to download your data\n\n"
+        print(info_prestaging)
+
+        self.send_link_to_hendrix_documentation()
+
+    def download(self):
+
+        self.send_link_to_confluence_table_with_downloaded_data()
+
+        dates = self.date_iterator(self.date_start, self.date_end)
+        names_netcdf = []
+
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc)
+        hc.download_daily_netcdf(self.start_term, self.start_term)
+        names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.start_term))
+
         for date in dates:
-            hc = HendrixConductor(getter, folder, model_name, date, domain, variables_nc)
-            for term in terms:
-                resource = hc.get_path_vortex_ressource(term)[0]
-                f.write(resource.split(':')[1] + "\n")
-
-    info_prestaging = "\n\nPlease find below the procedure for prestaging. \
-    Note a new file named 'request_prestaging_*.txt' has been created on your current folder\n\n1. \
-    Drop this file on Hendrix, in the folder DemandeMig/ChargeEnEspaceRapide \
-    \nYou can use FileZilla with your computer, or ftp to drop the file.\n\n2. \
-    Rename the extension of the file '.txt' (once it is on Hendrix) with '.MIG'\n\
-    'request_prestaging_*.txt'  => 'request_prestaging_.MIG'\n\n\
-    Note: don't rename in '.MIG' before dropping the file on Hendrix, or Hendrix could launch prestaging\
-    before the file is fully uploaded\n\n3. \
-    Please wait for an email from the Hendrix team to download your data\n\n"
-    print(info_prestaging)
-
-    send_link_to_hendrix_documentation()
-
-
-def concatenate_netcdf(type_concatenation, list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
-    if type_concatenation == "month":
-        concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
-    elif type_concatenation == "year":
-        concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
-    elif type_concatenation == "all":
-        concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
-
-
-def get_documentation():
-    send_link_to_hendrix_documentation()
-    print("\n\n")
-    send_link_to_confluence_table_with_downloaded_data()
-    print("\n\n")
-    send_link_to_AROME_variables()
-
-
-def send_link_to_hendrix_documentation():
-    print("The documentation of the storage system Hendrix is available here:")
-    print("http://confluence.meteo.fr/pages/viewpage.action?pageId=299881305")
-
-
-def send_link_to_confluence_table_with_downloaded_data():
-    link = "http: // confluence.meteo.fr / pages / viewpage.action?pageId = 314552092"
-    print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
-    print("Please see the link below")
-    print(link)
-
-
-def send_link_to_AROME_variables():
-    link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
-    print("Website with all AROME variables (might be outdated")
-    print(link)
-
-
-def concatenate_netcdf_by_year_and_month(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
-    dataset = xr.open_mfdataset([os.path.join(folder, file) for file in list_daily_netcdf_files])
-
-    list_years_months = get_year_and_month_between_dates(date_start, date_end)
-
-    for (year, month) in list_years_months:
-        condition_month = dataset["time.month"] == month
-        condition_year = dataset["time.year"] == year
-        filename = os.path.join(folder, f"{model_name}_{domain}_{year}_{month}.nc")
-        dataset.where(condition_month & condition_year, drop=True).to_netcdf(filename)
-
-
-def concatenate_netcdf_by_year(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
-    dataset = xr.open_mfdataset([os.path.join(folder, file) for file in list_daily_netcdf_files])
-
-    list_years = get_year_between_dates(date_start, date_end)
-
-    for year in list_years:
-        condition_year = dataset["time.year"] == year
-        filename = os.path.join(folder, f"{model_name}_{domain}_{year}.nc")
-        dataset.where(condition_year, drop=True).to_netcdf(filename)
-
-
-def concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end):
-    dataset = xr.open_mfdataset([os.path.join(folder, file) for file in list_daily_netcdf_files])
-    start_str = date_start.strftime('%Y%m%d_%Hh')
-    end_str = date_end.strftime('%Y%m%d_%Hh')
-    filename = os.path.join(folder, f"{model_name}_{domain}_from_{start_str}_to_{end_str}.nc")
-    dataset.to_netcdf(filename)
-
-
-def download(date_start, date_end, getter, folder, model_name, domain, variables_nc, start_term, end_term, type_concatenation):
-
-    send_link_to_confluence_table_with_downloaded_data()
-
-    dates = date_iterator(date_start, date_end)
-    names_netcdf = []
-
-    hc = HendrixConductor(getter, folder, model_name, date_start, domain, variables_nc)
-    hc.download_daily_netcdf(start_term, start_term)
-    names_netcdf.append(hc.generate_name_output_netcdf(start_term, start_term))
-
-    for date in dates:
-        print(date)
-        hc = HendrixConductor(getter, folder, model_name, date, domain, variables_nc)
-        hc.download_daily_netcdf(start_term+1, end_term)
-        names_netcdf.append(hc.generate_name_output_netcdf(start_term, end_term))
-    concatenate_netcdf(type_concatenation, names_netcdf, model_name, domain, folder, date_start, date_end)
+            print(date)
+            hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
+            hc.download_daily_netcdf(self.start_term+1, self.end_term)
+            names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.end_term))
+        self.concatenate_netcdf(names_netcdf)
 
 
 class HendrixConductor:
@@ -250,15 +222,60 @@ class HendrixConductor:
     def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc):
         self.folder = folder
         self.analysis_time = analysis_time
-        self.getter = getter
         self.model_name = model_name
         self.domain = domains[domain]
         self.transformations = {
                 key: value
                 for key, value in transformations.items()
                 if key in variables_nc}
+        self.getter = self.parse_getter(getter)
         self.cache_folder = self.generate_name_of_cache_folder()
         self.variables_fa = self.get_fa_variables_names()
+
+    def parse_getter(self, getter):
+        if getter == "hendrix":
+            return self.get_resource_from_hendrix
+        elif getter == "local":
+            raise NotImplementedError("We need to implement a getter from local ressources")
+        else:
+            raise NotImplementedError
+
+    @staticmethod
+    def _get_resources_vortex(resource_description):
+        i = 0
+        while i < 10:
+            try:
+                return usevortex.get_resources(getmode='epygram', **resource_description)
+            except Exception as e:
+                print("An exception has occured when using usevortex.get_resources command")
+                print(f"The exception raised is: {e}")
+                print("Exception at this stage can occur if Hendrix server is not accessible")
+                if i < 5:
+                    thirty_minutes = 30 * 60
+                    print("We will try accessing the resource again in 30 minutes")
+                    print("Number of tries allowed: 10")
+                    time.sleep(thirty_minutes)
+                    i += 1
+                elif 5 <= i < 9:
+                    print("We will try accessing the resource again in 1h")
+                    one_hour = 3600
+                    time.sleep(one_hour)
+                    i += 1
+                else:
+                    raise
+
+    def get_resource_from_hendrix(self, term):
+        resource_description = dict(
+            **get_model_description(self.model_name),
+            date=self.analysis_time,
+            term=term,
+            local=os.path.join(self.folder, 'tmp_file.fa')
+        )
+
+        resource = self._get_resources_vortex(resource_description)
+        resource = resource[0] if isinstance(resource, list) else resource
+
+        return resource
 
     def generate_name_of_cache_folder(self):
         random_key = str(uuid.uuid4())[:10]
@@ -393,10 +410,8 @@ class HendrixConductor:
         Fabrication des fichiers netcdf temporaires (1 par échéance)
         """
         self.create_cache_folder_if_doesnt_exist()
-        input_resource = self.getter(self.analysis_time, self.model_name, term, workdir=self.folder)
+        input_resource = self.download_resource_on_hendrix(term)
         output_resource = epygram.formats.resource(self.get_netcdf_filename_in_cache(term), 'w', fmt='netCDF')
-        # TODO: vérifier que c'est toujours ça qu'on veut
-        # (par exemple la dimension 'Number_of_points' peut-être pas nécessaire pour Arome
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
         for variable in self.variables_fa:
             field = self.read_epygram_field(input_resource, variable)
