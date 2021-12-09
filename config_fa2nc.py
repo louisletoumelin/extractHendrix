@@ -91,5 +91,11 @@ domains = {
         'alp': {'first_i': np.intp(900), 'last_i': np.intp(1075), 'first_j': np.intp(525), 'last_j': np.intp(750)},
         'pyr': {'first_i': np.intp(480), 'last_i': np.intp(785), 'first_j': np.intp(350), 'last_j': np.intp(475)},
         'test_alp': {'first_i': np.intp(1090), 'last_i': np.intp(1100), 'first_j': np.intp(740), 'last_j': np.intp(750)},
-        'jesus': {'first_i': np.intp(551), 'last_i': np.intp(593), 'first_j': np.intp(414), 'last_j': np.intp(435)}
-        }
+        'jesus': {'first_i': np.intp(551), 'last_i': np.intp(593), 'first_j': np.intp(414), 'last_j': np.intp(435)},
+        # switzerland: lower left corner = 45.56420273320563, 5.609121093614332,
+        # upper right corner = 47.971669285287895, 10.684804314227717
+        'switzerland': {'first_i': np.intp(931), 'last_i': np.intp(1211), 'first_j': np.intp(671), 'last_j': np.intp(899)},
+        #corsica: lower left corner = 41.261440607733036, 8.339223910913976
+        # upper right corner = 43.141222812632364, 9.718007989240773
+        'corsica': {'first_i': np.intp(1124), 'last_i': np.intp(1197), 'first_j': np.intp(314), 'last_j': np.intp(482)}
+}
