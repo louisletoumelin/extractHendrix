@@ -145,7 +145,7 @@ class Extractor:
     @staticmethod
     def send_link_to_AROME_variables():
         link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
-        print("Website with all AROME variables (might be outdated")
+        print("Website with all AROME variables (might be outdated)")
         print(link)
 
     def concatenate_netcdf(self, list_daily_netcdf_files):
