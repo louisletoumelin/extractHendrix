@@ -213,7 +213,7 @@ class Extractor:
             print(date)
             hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
             hc.download_daily_netcdf(self.start_term+1, self.end_term)
-            names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.end_term))
+            names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
         self.concatenate_netcdf(names_netcdf)
 
 
