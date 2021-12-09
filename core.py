@@ -388,29 +388,13 @@ class HendrixConductor:
             else:
                 raise
 
-    def download_resource_on_hendrix(self, term):
-        i = 0
-        while i < 10:
-            try:
-                return self.getter(self.analysis_time, self.model_name, term, workdir=self.folder)
-            except:
-                if i < 5:
-                    thirty_minutes = 30*60
-                    time.sleep(thirty_minutes)
-                    i += 1
-                elif 5 <= i < 9:
-                    one_hour = 3600
-                    time.sleep(one_hour)
-                    i += 1
-                else:
-                    raise
-
     def fa_to_netcdf(self, term):
         """
         Fabrication des fichiers netcdf temporaires (1 par échéance)
         """
         self.create_cache_folder_if_doesnt_exist()
-        input_resource = self.download_resource_on_hendrix(term)
+        input_resource = self.get_resource_from_hendrix(term)
+        print("debug: resource downloaded from Hendrix")
         output_resource = epygram.formats.resource(self.get_netcdf_filename_in_cache(term), 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
         for variable in self.variables_fa:
@@ -489,17 +473,48 @@ class HendrixConductor:
         self.delete_temporary_fa_file()
 
 """
-# reste l'écriture du netCDF final pas le temps de décrire mais ça devrait le faire
 if __name__ == '__main__':
-    # "tests"
-    resource = epygram.formats.resource(filename='/home/merzisenh/NO_SAVE/AROME/AROME_ana:2019-05-01-00h_term:0',
-                                        getmode='epygram',
-                                        openmode='r')
-    folder = '/home/merzisenh'
-    model_name = 'AROME'
-    analysis_time = datetime(2019, 5, 1, 0)
-    variables = ['SURFTEMPERATURE', 'CLSTEMPERATURE']
-    term = 1
-    domain = "alps"
-    epygram2netcdf(resource, domain, folder, model_name, variables, analysis_time, term)
+config_user = dict(
+
+#  Where you want to store the outputs
+folder= '/cnrm/cen/users/NO_SAVE/letoumelinl/folder/',
+
+# Models are defined in the models.ini file
+model_name = 'AROME',
+
+# The domain can be defined by its name or its coordinates
+# Existing domain can be found in the config_fa2nc.py file
+domain = "alp",
+lat_lon_lower_left = None,
+lat_lon_upper_right = None,
+
+# Variables to extract and to store in the netcdf file
+# Variable are defined in the config_fa2nc.py file
+variables_nc = ['Tair', 'Wind'],
+
+# "local" if the FA file are on your computer or "hendrix" otherwise
+getter = "hendrix",
+#get_resource_from_hendrix,
+
+# For prestaging and sending mail during (your mail = destination) extraction
+email_address = "louis.letoumelin@meteo.fr",
+
+# datetime(year, month, day, hour)
+date_start = datetime(2019, 5, 1, 0),
+date_end = datetime(2019, 5, 3, 0),
+
+# Analysis hour
+analysis_time = datetime(2019, 5, 1, 0),
+
+# Term in hour after analysis
+start_term = 6, # Default: 6 
+end_term = 6 + 24 ,# Defautl: 6+24 = 30
+    
+# How to group the netcdf files: "month", "year", "all"
+final_concatenation = "all"
+)
+
+e = Extractor(config_user)
+e.download()
+
 """
