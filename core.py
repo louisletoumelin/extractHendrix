@@ -46,7 +46,7 @@ class Extractor:
         self.variables_nc = config_user.get("variables_nc")
         self.date_start = config_user.get("date_start")
         self.date_end = config_user.get("date_end")
-        self.email_adress = config_user.get("email_address")
+        self.email_address = config_user.get("email_address")
         self.start_term = config_user.get("start_term")
         self.end_term = config_user.get("end_term")
         self.final_concatenation = config_user.get("final_concatenation")
@@ -119,7 +119,7 @@ class Extractor:
 
     @staticmethod
     def send_link_to_confluence_table_with_downloaded_data():
-        link = "http: // confluence.meteo.fr / pages / viewpage.action?pageId = 314552092"
+        link = "http://confluence.meteo.fr/pages/viewpage.action?pageId=314552092"
         print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
         print("Please see the link below")
         print(link)
