@@ -5,7 +5,7 @@ transformations = {
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],#CLSTEMPERATURE
                         grib_field_required=['CLSTEMPERATURE'],
-                        compute="compute_decumul",
+                        compute=None,
                         details_original_field="2 m Temperature"),
                'T1':
                    dict(fa_fields_required=['S090TEMPERATURE'],
