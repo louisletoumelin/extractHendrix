@@ -169,7 +169,7 @@ def concatenate_netcdf(type_concatenation, list_daily_netcdf_files, model_name, 
         concatenate_all_netcdf(list_daily_netcdf_files, model_name, domain, folder, date_start, date_end)
 
 
-def help():
+def infos():
     send_link_to_hendrix_documentation()
     print("\n\n")
     send_link_to_confluence_table_with_downloaded_data()
