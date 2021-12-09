@@ -28,6 +28,24 @@ Fonctions:
 delta_terms = 1
 
 
+def timer_decorator(argument, unit='minute', level="__"):
+    def decorator(function):
+        def wrapper(*args, **kwargs):
+            t0 = time.time()
+            result = function(*args, **kwargs)
+            t1 = time.time()
+            if unit == "hour":
+                time_execution = np.round((t1 - t0) / (3600), 2)
+            elif unit == "minute":
+                time_execution = np.round((t1-t0) / 60, 2)
+            elif unit == "second":
+                time_execution = np.round((t1 - t0), 2)
+            print(f"{level}Time to calculate {argument}: {time_execution} {unit}s")
+            return result
+        return wrapper
+    return decorator
+
+
 def get_model_description(model_name):
     # todo give the path to models.ini
     config = configparser.ConfigParser()
@@ -388,6 +406,7 @@ class HendrixConductor:
             else:
                 raise
 
+    @timer_decorator("fa_to_netcdf", unit='minute', level="____")
     def fa_to_netcdf(self, term):
         """
         Fabrication des fichiers netcdf temporaires (1 par échéance)
@@ -451,23 +470,24 @@ class HendrixConductor:
 
         return output_dict
 
+    @timer_decorator("download daily netcdf", unit='minute', level="__")
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
 
-        print("fa_to_netcdf")
+        print("debug: fa_to_netcdf")
         for term in range(start_term-1, end_term+1):
-            print("term", term)
+            print("debug: term", term)
             self.fa_to_netcdf(term)
 
-        print("netcdf_in_cache_to_dict")
+        print("debug: netcdf_in_cache_to_dict")
         dict_data = self.netcdf_in_cache_to_dict(start_term, end_term)
 
-        print("post_process dict_data")
+        print("debug: post_process dict_data")
         post_processed_data = defaultdict(lambda: defaultdict(list))
         for term in range(start_term, end_term+1):
-            print("term", term)
+            print("debug: term", term)
             post_processed_data = self.post_process(dict_data, post_processed_data, term, **kwargs)
 
-        print("dict_to_netcdf")
+        print("debug: dict_to_netcdf")
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()
