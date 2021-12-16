@@ -5,6 +5,11 @@ import configparser
 import uuid
 import time
 import shutil
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formatdate
+import time
 
 import numpy as np
 import xarray as xr
@@ -13,6 +18,7 @@ import usevortex
 import epygram
 from config_fa2nc import transformations, domains, alternatives_names_fa
 from post_processing_functions import *
+from hendrix_emails import dict_with_all_emails
 
 """
 Fonctions:
@@ -53,6 +59,78 @@ def get_model_description(model_name):
     return dict(config[model_name])
 
 
+def get_name_from_email(email_address):
+    return email_address.split("@")[0].replace('.', '_')
+
+
+def _prepare_subject_and_message(type_of_email, email_address, **kwargs):
+    """Returns the subject of the mail (str) and the message (html)"""
+
+    user = get_name_from_email(email_address)
+
+    if type_of_email == "problem_extraction":
+
+        kwargs_html = dict(
+            user=user,
+            error_message=kwargs.get("error_message"),
+            time_of_problem=kwargs.get("time_of_problem"),
+            resource_that_stopped=kwargs.get("resource_that_stopped"),
+            folder=kwargs.get("folder"),
+            nb_of_try=kwargs.get("nb_of_try"),
+            time_waiting=kwargs.get("time_waiting"),
+        )
+
+    if type_of_email == "finished":
+
+        kwargs_html = dict(
+            user=user,
+            config_user=kwargs.get("config_user"),
+            current_time=kwargs.get("current_time"),
+            time_to_download=kwargs.get("time_to_download"),
+            errors=kwargs.get("errors"),
+            folder=kwargs.get("folder"),
+        )
+
+    if type_of_email == "script_stopped":
+        kwargs_html = dict(
+            user=user,
+            config_user=kwargs.get("config_user"),
+            current_time=kwargs.get("current_time"),
+            error=kwargs.get("error"),
+            folder=kwargs.get("folder"),
+        )
+
+    html = dict_with_all_emails[type_of_email][1].format(**kwargs_html)
+    return html
+
+
+def send_email(type_of_email, email_address, **kwargs):
+    server = smtplib.SMTP()
+    server.connect('smtp.cnrm.meteo.fr')
+    server.helo()
+
+    from_addr = 'HendrixConductor <do_not_answer@hendrixconductor.fr>'
+    to_addrs = email_address if isinstance(email_address, list) else [email_address]
+
+    msg = MIMEMultipart('alternative')
+    msg['From'] = from_addr
+    msg['To'] = ','.join(to_addrs)
+    msg["Date"] = formatdate(localtime=True)
+
+    msg['Subject'] = dict_with_all_emails[type_of_email][0]
+    html = _prepare_subject_and_message(type_of_email, email_address, **kwargs)
+    part = MIMEText(html, 'html')
+    msg.attach(part)
+
+    try:
+        server.sendmail(from_addr, to_addrs, msg.as_string())
+    except smtplib.SMTPException as e:
+        print(f"Email {type_of_email} could not be launched. The error is: ")
+        print(e)
+
+    server.quit()
+
+
 class Extractor:
 
     def __init__(self, config_user):
@@ -68,6 +146,8 @@ class Extractor:
         self.start_term = config_user.get("start_term")
         self.end_term = config_user.get("end_term")
         self.final_concatenation = config_user.get("final_concatenation")
+        self.errors = dict()
+        self.config_user = config_user
 
     @staticmethod
     def date_iterator(date_start, date_end):
@@ -80,10 +160,10 @@ class Extractor:
     @staticmethod
     def get_year_and_month_between_dates(start, end):
         """
-        date_start = datetime(2019, 5, 1, 0)
-        date_end = datetime(2020, 12, 3, 0)
+        date_start = datetime(2019, 10, 1, 0)
+        date_end = datetime(2020, 2, 29, 0)
+        # returns [(2019, 10), (2019, 11), (2019, 12), (2020, 1), (2020, 2)]
         get_year_and_month_between_dates(date_start, date_end)
-        # returns [(2019, 5), (2019, 6), (2019, 7), (2019, 8), (2019, 9), (2019, 10)]
         """
         total_months = lambda dt: dt.month + 12 * dt.year
         mlist = []
@@ -149,15 +229,26 @@ class Extractor:
         print(link)
 
     def concatenate_netcdf(self, list_daily_netcdf_files):
-        if self.final_concatenation == "month":
-            self._concatenate_netcdf_by_year_and_month(list_daily_netcdf_files)
-        elif self.final_concatenation == "year":
-            self._concatenate_netcdf_by_year(list_daily_netcdf_files)
-        elif self.final_concatenation == "all":
-            self._concatenate_all_netcdf(list_daily_netcdf_files)
 
-    def _concatenate_netcdf_by_year_and_month(self, list_daily_netcdf_files):
-        dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+        try:
+            dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+        except:
+            self.errors["concatenation"] = "Files are not concatenated with the desired final format \n" \
+                                           "We could not read all file at once using xarray. " \
+                                           "This is likely due to the fact that the number of point in your domain" \
+                                           "varies with time (e.g. +/- 1 pixel)"
+            return
+
+        if self.final_concatenation == "month":
+            self._concatenate_netcdf_by_year_and_month(dataset)
+        elif self.final_concatenation == "year":
+            self._concatenate_netcdf_by_year(dataset)
+        elif self.final_concatenation == "all":
+            self._concatenate_all_netcdf(dataset)
+        else:
+            return
+
+    def _concatenate_netcdf_by_year_and_month(self, dataset):
 
         list_years_months = self.get_year_and_month_between_dates(self.date_start, self.date_end)
 
@@ -167,8 +258,7 @@ class Extractor:
             filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}_{month}.nc")
             dataset.where(condition_month & condition_year, drop=True).to_netcdf(filename)
 
-    def _concatenate_netcdf_by_year(self, list_daily_netcdf_files):
-        dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+    def _concatenate_netcdf_by_year(self, dataset):
 
         list_years = self.get_year_between_dates(self.date_start, self.date_end)
 
@@ -177,8 +267,7 @@ class Extractor:
             filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}.nc")
             dataset.where(condition_year, drop=True).to_netcdf(filename)
 
-    def _concatenate_all_netcdf(self, list_daily_netcdf_files):
-        dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+    def _concatenate_all_netcdf(self, dataset):
         start_str = self.date_start.strftime('%Y%m%d_%Hh')
         end_str = self.date_end.strftime('%Y%m%d_%Hh')
         filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_from_{start_str}_to_{end_str}.nc")
@@ -190,9 +279,9 @@ class Extractor:
 
         begin_str = self.date_start.strftime("%m/%d/%Y").replace('/', '_')
         end_str = self.date_end.strftime("%m/%d/%Y").replace('/', '_')
-        mail_str = self.email_address.split("@")[0].replace('.', '_')
+        name_str = get_name_from_email(self.email_address)
 
-        filename = f"request_prestaging_{mail_str}_{self.model_name}_begin_{begin_str}_end_{end_str}.txt"
+        filename = f"request_prestaging_{name_str}_{self.model_name}_begin_{begin_str}_end_{end_str}.txt"
         filename = os.path.join(self.folder, filename)
 
         with open(filename, "w+") as f:
@@ -217,31 +306,48 @@ class Extractor:
         self.send_link_to_hendrix_documentation()
 
     def download(self):
+        try:
+            t0 = time.time()
 
-        self.send_link_to_confluence_table_with_downloaded_data()
+            self.send_link_to_confluence_table_with_downloaded_data()
 
-        dates = self.date_iterator(self.date_start, self.date_end)
-        names_netcdf = []
+            dates = self.date_iterator(self.date_start, self.date_end)
+            names_netcdf = []
 
-        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc)
-        hc.download_daily_netcdf(self.start_term, self.start_term)
-        names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.start_term))
+            hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc)
+            hc.download_daily_netcdf(self.start_term, self.start_term)
+            names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.start_term))
 
-        for date in dates:
-            print(date)
-            hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
-            hc.download_daily_netcdf(self.start_term+1, self.end_term)
-            names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
-        self.concatenate_netcdf(names_netcdf)
+            for date in dates:
+                print(date)
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
+                hc.download_daily_netcdf(self.start_term+1, self.end_term)
+                names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
+            self.concatenate_netcdf(names_netcdf)
+
+            send_email("finished", self.email_address,
+                       config_user=str(self.config_user),
+                       current_time=time.asctime(),
+                       time_to_download=str(np.round((time.time()-t0) / 60, 2)),
+                       errors=str(self.errors),
+                       folder=self.folder)
+
+        except Exception as e:
+            send_email("script_stopped", self.email_address,
+                       config_user=self.config_user,
+                       current_time=time.asctime(),
+                       error=e,
+                       folder=self.folder)
 
 
 class HendrixConductor:
 
-    def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc):
+    def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address):
         self.folder = folder
         self.analysis_time = analysis_time
         self.model_name = model_name
         self.domain = domains[domain]
+        self.email_address = email_address
         self.transformations = {
                 key: value
                 for key, value in transformations.items()
@@ -258,8 +364,7 @@ class HendrixConductor:
         else:
             raise NotImplementedError
 
-    @staticmethod
-    def _get_resources_vortex(resource_description):
+    def _get_resources_vortex(self, resource_description):
         i = 0
         while i < 10:
             try:
@@ -273,6 +378,15 @@ class HendrixConductor:
                     print("We will try accessing the resource again in 30 minutes")
                     print("Number of tries allowed: 10")
                     time.sleep(thirty_minutes)
+
+                    send_email("problem_extraction", self.email_address,
+                               user=get_name_from_email(self.email_address),
+                               error_message=e,
+                               time_of_problem=time.asctime(),
+                               resource_that_stopped=str(resource_description),
+                               folder=self.folder,
+                               nb_of_try=str(i+1),
+                               time_waiting=str(30))
                     i += 1
                 elif 5 <= i < 9:
                     print("We will try accessing the resource again in 1h")
@@ -491,6 +605,7 @@ class HendrixConductor:
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()
+
 
 """
 if __name__ == '__main__':
