@@ -4,6 +4,7 @@ from collections import defaultdict
 import configparser
 import uuid
 import time
+import sys
 import shutil
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -91,6 +92,7 @@ def _prepare_html(type_of_email, email_address, **kwargs):
         )
 
     if type_of_email == "script_stopped":
+
         kwargs_html = dict(
             user=user,
             config_user=kwargs.get("config_user"),
@@ -128,6 +130,18 @@ def send_email(type_of_email, email_address, **kwargs):
         print(e)
 
     server.quit()
+
+
+def callSystemOrDie(commande, errorcode=None):
+    status = os.system(commande)
+    if status != 0:
+
+        if type(errorcode) is int:
+            print("The following command fails with error code " + str(status) + ":\n" + commande)
+            sys.exit(errorcode)
+        else:
+            sys.exit("The following command fails with error code " + str(status) + ":\n" + commande)
+    return status
 
 
 class Extractor:
@@ -202,7 +216,7 @@ class Extractor:
         Return:
         first_i, last_i, first_j, last_j
         """
-        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc)
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address)
         resource = hc.get_resource_from_hendrix(term)
         field = resource.readfield('CLSTEMPERATURE')
         x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
@@ -286,7 +300,7 @@ class Extractor:
         with open(filename, "w+") as f:
             f.write(f"#MAIL={self.email_address}\n")
             for date in dates:
-                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address)
                 for term in range(self.start_term, self.end_term):
                     resource = hc.get_path_vortex_ressource(term)[0]
                     f.write(resource.split(':')[1] + "\n")
@@ -313,13 +327,13 @@ class Extractor:
             dates = self.date_iterator(self.date_start, self.date_end)
             names_netcdf = []
 
-            hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc)
+            hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address)
             hc.download_daily_netcdf(self.start_term, self.start_term)
             names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.start_term))
 
             for date in dates:
                 print(date)
-                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc)
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address)
                 hc.download_daily_netcdf(self.start_term+1, self.end_term)
                 names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
             self.concatenate_netcdf(names_netcdf)
@@ -337,6 +351,7 @@ class Extractor:
                        current_time=time.asctime(),
                        error=e,
                        folder=self.folder)
+            raise
 
 
 class HendrixConductor:
@@ -527,6 +542,22 @@ class HendrixConductor:
             else:
                 raise
 
+    def add_metadate_necessary_to_surfex(self, name_netcdf_file):
+        """Not ready yet"""
+        """
+        callSystemOrDie("ncap2 -O -s 'FORC_TIME_STEP=3600.' " + name_netcdf_file + " " + name_netcdf_file)
+        callSystemOrDie("ncap2 -O -s 'CO2air=Tair*0. + 0.00062' " + name_netcdf_file + " " + name_netcdf_file)
+        #   callSystemOrDie("ncap2 -O -s 'Wind_DIR=Tair*0. + 0.' "+forcing_file+" "+forcing_file)
+        callSystemOrDie("ncap2 -O -s 'UREF=ZS*0. + 10.' " + name_netcdf_file + " " + name_netcdf_file)
+        callSystemOrDie("ncap2 -O -s 'ZREF=ZS*0. + 2.' " + name_netcdf_file + " " + name_netcdf_file)
+        callSystemOrDie(
+            "ncap2 -O -s'slope=ZS*0.+0.;aspect=ZS*0.+0.;FRC_TIME_STP=FORC_TIME_STEP' " + name_netcdf_file + " " + name_netcdf_file)
+        callSystemOrDie("ncrename -O -v latitude,LAT " + name_netcdf_file)
+        callSystemOrDie("ncrename -O -v longitude,LON " + name_netcdf_file)
+        callSystemOrDie("ncks -O --mk_rec_dmn time " + name_netcdf_file + " " + name_netcdf_file)
+        """
+        pass
+
     @timer_decorator("fa_to_netcdf", unit='minute', level="____")
     def fa_to_netcdf(self, term):
         """
@@ -535,7 +566,8 @@ class HendrixConductor:
         self.create_cache_folder_if_doesnt_exist()
         input_resource = self.get_resource_from_hendrix(term)
         print("debug: resource downloaded from Hendrix")
-        output_resource = epygram.formats.resource(self.get_netcdf_filename_in_cache(term), 'w', fmt='netCDF')
+        netcdf_filename = self.get_netcdf_filename_in_cache(term)
+        output_resource = epygram.formats.resource(netcdf_filename, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
         for variable in self.variables_fa:
             field = self.read_epygram_field(input_resource, variable)
@@ -544,6 +576,7 @@ class HendrixConductor:
             field = self.extract_domain_pixels(field)
             output_resource.writefield(field)
 
+        self.add_metadate_necessary_to_surfex(netcdf_filename)
         self.write_time_fa_in_txt_file(field)
 
     def netcdf_in_cache_to_dict(self, start_term, end_term):
