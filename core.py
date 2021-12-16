@@ -391,6 +391,14 @@ class HendrixConductor:
                     print("We will try accessing the resource again in 1h")
                     one_hour = 3600
                     time.sleep(one_hour)
+                    send_email("problem_extraction", self.email_address,
+                               user=get_name_from_email(self.email_address),
+                               error_message=e,
+                               time_of_problem=time.asctime(),
+                               resource_that_stopped=str(resource_description),
+                               folder=self.folder,
+                               nb_of_try=str(i + 1),
+                               time_waiting=str(60))
                     i += 1
                 else:
                     raise
