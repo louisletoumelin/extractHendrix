@@ -9,7 +9,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
-import time
 
 import numpy as np
 import xarray as xr
@@ -63,7 +62,7 @@ def get_name_from_email(email_address):
     return email_address.split("@")[0].replace('.', '_')
 
 
-def _prepare_subject_and_message(type_of_email, email_address, **kwargs):
+def _prepare_html(type_of_email, email_address, **kwargs):
     """Returns the subject of the mail (str) and the message (html)"""
 
     user = get_name_from_email(email_address)
@@ -118,7 +117,7 @@ def send_email(type_of_email, email_address, **kwargs):
     msg["Date"] = formatdate(localtime=True)
 
     msg['Subject'] = dict_with_all_emails[type_of_email][0]
-    html = _prepare_subject_and_message(type_of_email, email_address, **kwargs)
+    html = _prepare_html(type_of_email, email_address, **kwargs)
     part = MIMEText(html, 'html')
     msg.attach(part)
 
