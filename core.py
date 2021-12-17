@@ -63,48 +63,6 @@ def get_name_from_email(email_address):
     return email_address.split("@")[0].replace('.', '_')
 
 
-def _prepare_html(type_of_email, email_address, **kwargs):
-    """Returns the subject of the mail (str) and the message (html)"""
-
-    user = get_name_from_email(email_address)
-
-    if type_of_email == "problem_extraction":
-
-        kwargs_html = dict(
-            user=user,
-            error_message=kwargs.get("error_message"),
-            time_of_problem=kwargs.get("time_of_problem"),
-            resource_that_stopped=kwargs.get("resource_that_stopped"),
-            folder=kwargs.get("folder"),
-            nb_of_try=kwargs.get("nb_of_try"),
-            time_waiting=kwargs.get("time_waiting"),
-        )
-
-    if type_of_email == "finished":
-
-        kwargs_html = dict(
-            user=user,
-            config_user=kwargs.get("config_user"),
-            current_time=kwargs.get("current_time"),
-            time_to_download=kwargs.get("time_to_download"),
-            errors=kwargs.get("errors"),
-            folder=kwargs.get("folder"),
-        )
-
-    if type_of_email == "script_stopped":
-
-        kwargs_html = dict(
-            user=user,
-            config_user=kwargs.get("config_user"),
-            current_time=kwargs.get("current_time"),
-            error=kwargs.get("error"),
-            folder=kwargs.get("folder"),
-        )
-
-    html = dict_with_all_emails[type_of_email][1].format(**kwargs_html)
-    return html
-
-
 def send_email(type_of_email, email_address, **kwargs):
     server = smtplib.SMTP()
     server.connect('smtp.cnrm.meteo.fr')
