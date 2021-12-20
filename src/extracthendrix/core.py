@@ -7,18 +7,20 @@ import time
 import sys
 import shutil
 import smtplib
+import pkg_resources
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
+
 
 import numpy as np
 import xarray as xr
 
 import usevortex
 import epygram
-from config_fa2nc import transformations, domains, alternatives_names_fa
-from post_processing_functions import *
-from hendrix_emails import dict_with_all_emails
+from extracthendrix.config.config_fa2nc import transformations, domains, alternatives_names_fa
+from extracthendrix.config.post_processing_functions import *
+from extracthendrix.hendrix_emails import dict_with_all_emails
 
 """
 Fonctions:
@@ -53,9 +55,9 @@ def timer_decorator(argument, unit='minute', level="__"):
 
 
 def get_model_description(model_name):
-    # todo give the path to models.ini
     config = configparser.ConfigParser()
-    config.read('models.ini')
+    models_path = pkg_resources.resource_filename('extracthendrix.config', 'models.ini')
+    config.read(models_path)
     return dict(config[model_name])
 
 

@@ -6,7 +6,7 @@ import os
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
 
-from core import get_model_description
+from extracthendrix.core import get_model_description
 
 
 available_combinations = [
@@ -59,8 +59,6 @@ for combination in available_combinations:
         comb_copy = dict(**combination)
         comb_copy.update(dict(kind=kind, runtime=runtime, previ=previ, member=member))
         available_single_combinations.append(comb_copy)
-
-
 
 
 class RunDoesntExistException(Exception):
