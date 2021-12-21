@@ -110,6 +110,7 @@ class CanNotReadEpygramField(Exception):
 
 
 class Extractor:
+    """This class extracts data defined in config_user"""
 
     def __init__(self, config_user):
         self.getter = config_user.get("getter")
@@ -329,6 +330,7 @@ class Extractor:
 
 
 class HendrixConductor:
+    """This class extract single fa files and returns daily netcdf files"""
 
     def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address):
         self.folder = folder

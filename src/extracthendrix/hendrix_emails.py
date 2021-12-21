@@ -125,4 +125,5 @@ def _prepare_html(type_of_email, email_address, **kwargs):
         )
 
     html = dict_with_all_emails[type_of_email][1].format(**kwargs_html)
+
     return html
