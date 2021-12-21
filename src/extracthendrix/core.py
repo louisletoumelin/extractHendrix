@@ -578,6 +578,7 @@ class HendrixConductor:
             field = self.extract_domain_pixels(field)
             output_resource.writefield(field)
 
+        #todo implement this function
         self.add_metadate_necessary_to_surfex(netcdf_filename)
         self.write_time_fa_in_txt_file(field)
         logging.debug(f"Successfully converted a fa file to netcdf for term {term}")
