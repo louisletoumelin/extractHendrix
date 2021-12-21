@@ -85,9 +85,9 @@ def send_email(type_of_email, email_address, **kwargs):
 
     try:
         server.sendmail(from_addr, to_addrs, msg.as_string())
+        logging.info(f"Successfully sent an email to {to_addrs}")
     except smtplib.SMTPException as e:
-        print(f"Email {type_of_email} could not be launched. The error is: ")
-        print(e)
+        logging.error(f"Email {type_of_email} could not be launched. The error is: {e}")
 
     server.quit()
 
@@ -469,10 +469,12 @@ class HendrixConductor:
     def delete_cache_folder(self):
         """Delete temporary cache folder"""
         shutil.rmtree(self.cache_folder, ignore_errors=True)
+        logging.debug("Deleted temporary folder")
 
     def delete_temporary_fa_file(self):
         """Delete temporary fa file"""
         os.remove(os.path.join(self.folder, 'tmp_file.fa'))
+        logging.debug("Deleted temporary fa file")
 
     @staticmethod
     def transform_spectral_field_if_required(field):
@@ -576,6 +578,7 @@ class HendrixConductor:
 
         self.add_metadate_necessary_to_surfex(netcdf_filename)
         self.write_time_fa_in_txt_file(field)
+        logging.debug(f"Successfully converted a fa file to netcdf for term {term}")
 
     def netcdf_in_cache_to_dict(self, start_term, end_term):
         """
@@ -596,6 +599,7 @@ class HendrixConductor:
             dict_from_xarray = nc_file.to_dict()
             for variable in self.variables_fa:
                 dict_data[term][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
+        logging.debug("Successfully converted netcdf (for each term) into a nested dictionary containing numpy arrays")
         return dict_data
 
     def post_process(self, input_dict, output_dict, term, **kwargs):
@@ -622,11 +626,13 @@ class HendrixConductor:
         time = self.read_times_fa_in_txt_file()
         dataset["time"] = (('time'), time[1:])
         dataset.to_netcdf(os.path.join(self.folder, filename_nc))
+        logging.debug("Successfully converted nested dict to netcdf")
 
     @timer_decorator("download daily netcdf", unit='minute', level="__")
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
         """Downloads a single day"""
         for term in range(start_term-1, end_term+1):
+            logging.debug(f"Begin to download term {term}")
             self.fa_to_netcdf(term)
 
         dict_data = self.netcdf_in_cache_to_dict(start_term, end_term)
@@ -635,9 +641,11 @@ class HendrixConductor:
         for term in range(start_term, end_term+1):
             post_processed_data = self.post_process(dict_data, post_processed_data, term, **kwargs)
 
+        logging.debug("Successfully postprocessed data in nested dictionary")
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()
+
 
 
 """
