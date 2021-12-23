@@ -78,7 +78,30 @@ dict_with_all_emails = \
                 <p> HendrixConductor </p>
                 <p> </p>
                 <p> </p>
-                """)
+                """),
+
+        extracted_first_half=(
+            "Your extraction on Hendrix is on its way",
+            """
+            <p> Dear {user}, </p>
+            <p> </p>
+            <p> <strong> We downloaded half of your data on Hendrix. </strong></p>
+            <p> The configuration is: </p>
+            <p style = "text-align: center;" > {config_user} </p>
+            <p> Total time to download 50% of the files: </p>
+            <p style = "text-align: center;"> {time_to_download} hours </p>
+            <p> If an error occured it should be listed below:</p>
+            <p style = "text-align: center;" > {error} </p>
+            <p> Current time is:</p>
+            <p style = "text-align: center;" > {current_time} </p>
+            <p style = "text-align: left;"> We remind you that we are working here: </p>
+            <p style = "text-align: center;">  {folder} </p>
+            <pstyle="margin-bottom:1.5cm;"> </p>
+            <p> </p>
+            <p> HendrixConductor </p>
+            <p> </p>
+            <p> </p>
+            """)
     )
 
 
@@ -121,6 +144,17 @@ def _prepare_html(type_of_email, email_address, **kwargs):
             config_user=kwargs.get("config_user"),
             current_time=kwargs.get("current_time"),
             error=kwargs.get("error"),
+            folder=kwargs.get("folder"),
+        )
+
+    if type_of_email == "extracted_first_half":
+
+        kwargs_html = dict(
+            user=user,
+            config_user=kwargs.get("config_user"),
+            current_time=kwargs.get("current_time"),
+            time_to_download=kwargs.get("time_to_download"),
+            errors=kwargs.get("errors"),
             folder=kwargs.get("folder"),
         )
 

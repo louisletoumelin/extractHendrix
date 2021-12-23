@@ -13,6 +13,12 @@ from email.mime.text import MIMEText
 from email.utils import formatdate
 import logging
 
+logger_epygram = logging.getLogger('epygram')
+logger_epygram.setLevel(level=logging.CRITICAL)
+
+logger_vortex = logging.getLogger('vortex')
+logger_vortex.setLevel(level=logging.CRITICAL)
+
 import numpy as np
 import xarray as xr
 
@@ -23,7 +29,8 @@ from extracthendrix.config.post_processing_functions import *
 from extracthendrix.hendrix_emails import dict_with_all_emails, _prepare_html
 
 
-delta_terms = 1
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 def timer_decorator(argument, unit='minute', level="__"):
@@ -85,9 +92,9 @@ def send_email(type_of_email, email_address, **kwargs):
 
     try:
         server.sendmail(from_addr, to_addrs, msg.as_string())
-        logging.info(f"Successfully sent an email to {to_addrs}")
+        logger.info(f"Successfully sent an email to {to_addrs}")
     except smtplib.SMTPException as e:
-        logging.error(f"Email {type_of_email} could not be launched. The error is: {e}")
+        logger.error(f"Email {type_of_email} could not be launched. The error is: {e}")
 
     server.quit()
 
@@ -109,6 +116,33 @@ class CanNotReadEpygramField(Exception):
     pass
 
 
+def print_documentation():
+    """print all links to documentation"""
+    print_link_to_hendrix_documentation()
+    print("\n\n")
+    print_link_to_confluence_table_with_downloaded_data()
+    print("\n\n")
+    print_link_to_arome_variables()
+
+
+def print_link_to_hendrix_documentation():
+    print("The documentation of the storage system Hendrix is available here:")
+    print("http://confluence.meteo.fr/pages/viewpage.action?pageId=299881305")
+
+
+def print_link_to_confluence_table_with_downloaded_data():
+    link = "http://confluence.meteo.fr/pages/viewpage.action?pageId=314552092"
+    print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
+    print("Please see the link below")
+    print(link)
+
+
+def print_link_to_arome_variables():
+    link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
+    print("Website with all AROME variables (might be outdated)")
+    print(link)
+
+
 class Extractor:
     """This class extracts data defined in config_user"""
 
@@ -116,14 +150,15 @@ class Extractor:
         self.getter = config_user.get("getter")
         self.folder = config_user.get("folder")
         self.model_name = config_user.get("model_name")
-        self.analysis_time = config_user.get("analysis_time")
+        self.analysis_hour = config_user.get("analysis_hour")
         self.domain = config_user.get("domain")
         self.variables_nc = config_user.get("variables_nc")
-        self.date_start = config_user.get("date_start")
-        self.date_end = config_user.get("date_end")
+        self.date_start = config_user.get("date_start") + timedelta(hours=self.analysis_hour)
+        self.date_end = config_user.get("date_end") + timedelta(hours=self.analysis_hour)
         self.email_address = config_user.get("email_address")
         self.start_term = config_user.get("start_term")
         self.end_term = config_user.get("end_term")
+        self.delta_terms = config_user.get("delta_terms")
         self.final_concatenation = config_user.get("final_concatenation")
         self.errors = dict()
         self.config_user = config_user
@@ -177,38 +212,12 @@ class Extractor:
         Return:
         first_i, last_i, first_j, last_j
         """
-        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address)
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address, self.delta_terms)
         resource = hc.get_resource_from_hendrix(term)
         field = resource.readfield('CLSTEMPERATURE')
         x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
         x2, y2 = np.round(field.geometry.ll2ij(ur_lon, ur_lat)) + 1
         return x1, x2, y1, y2
-
-    def print_documentation(self):
-        """print all links to documentation"""
-        self.print_link_to_hendrix_documentation()
-        print("\n\n")
-        self.print_link_to_confluence_table_with_downloaded_data()
-        print("\n\n")
-        self.print_link_to_arome_variables()
-
-    @staticmethod
-    def print_link_to_hendrix_documentation():
-        print("The documentation of the storage system Hendrix is available here:")
-        print("http://confluence.meteo.fr/pages/viewpage.action?pageId=299881305")
-
-    @staticmethod
-    def print_link_to_confluence_table_with_downloaded_data():
-        link = "http://confluence.meteo.fr/pages/viewpage.action?pageId=314552092"
-        print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
-        print("Please see the link below")
-        print(link)
-
-    @staticmethod
-    def print_link_to_arome_variables():
-        link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
-        print("Website with all AROME variables (might be outdated)")
-        print(link)
 
     def concatenate_netcdf(self, list_daily_netcdf_files):
         """Concatenates files according to desired output shape"""
@@ -240,6 +249,7 @@ class Extractor:
             condition_year = dataset["time.year"] == year
             filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}_{month}.nc")
             dataset.where(condition_month & condition_year, drop=True).to_netcdf(filename)
+        logger.info("Concatenation by year and month worked")
 
     def _concatenate_netcdf_by_year(self, dataset):
         """Internal method to concatenated a xarray dataset composed of daily files into individual files by year"""
@@ -249,6 +259,7 @@ class Extractor:
             condition_year = dataset["time.year"] == year
             filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}.nc")
             dataset.where(condition_year, drop=True).to_netcdf(filename)
+        logger.info("Concatenation by year worked")
 
     def _concatenate_all_netcdf(self, dataset):
         """Internal method to concatenate daily files into a single netcdf file"""
@@ -256,6 +267,8 @@ class Extractor:
         end_str = self.date_end.strftime('%Y%m%d_%Hh')
         filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_from_{start_str}_to_{end_str}.nc")
         dataset.to_netcdf(filename)
+        logger.info("Concatenation worked")
+
 
     def prepare_prestaging_demand(self):
         """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
@@ -271,8 +284,8 @@ class Extractor:
         with open(filename, "w+") as f:
             f.write(f"#MAIL={self.email_address}\n")
             for date in dates:
-                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address)
-                for term in range(self.start_term, self.end_term):
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address, self.delta_terms)
+                for term in range(self.start_term, self.end_term, self.delta_terms):
                     resource = hc.get_path_vortex_ressource(term)[0]
                     f.write(resource.split(':')[1] + "\n")
 
@@ -287,40 +300,63 @@ class Extractor:
         Please wait for an email from the Hendrix team to download your data\n\n"
         print(info_prestaging)
 
-        self.print_link_to_hendrix_documentation()
+        print_link_to_hendrix_documentation()
+
+    def send_email_at_half_execution(self, nb_days_to_extract, idx_date, t0):
+        if nb_days_to_extract > 100 and idx_date == (nb_days_to_extract // 2 + 1):
+            send_email("extracted_first_half", self.email_address,
+                       config_user=str(self.config_user),
+                       current_time=time.asctime(),
+                       time_to_download=str(np.round((time.time() - t0) / 3600, 2)),
+                       errors=str(self.errors),
+                       folder=self.folder)
+
+    def _extract_initial_term(self):
+        logger.info(f"Begin to extract initial term {self.start_term - 1} of first date {self.date_start}")
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain,
+                              self.variables_nc, self.email_address, self.delta_terms)
+        hc.download_daily_netcdf(self.start_term, self.start_term)
+        name_initial_netcdf = hc.generate_name_output_netcdf(self.start_term, self.start_term)
+        logger.info("Initial term extracted")
+        return name_initial_netcdf
 
     def download(self):
         """Download data"""
         try:
             t0 = time.time()
-
-            self.print_link_to_confluence_table_with_downloaded_data()
+            print_link_to_confluence_table_with_downloaded_data()
 
             dates = self.date_iterator(self.date_start, self.date_end)
             names_netcdf = []
 
-            logging.info(f"Begin to extract initial term {self.start_term} of first date {self.date_start}")
-            hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address)
-            hc.download_daily_netcdf(self.start_term, self.start_term)
-            names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.start_term))
+            name_initial_netcdf = self._extract_initial_term()
+            names_netcdf.append(name_initial_netcdf)
 
-            for date in dates:
-                logging.info(f"Begin to extract {date}")
-                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address)
+            nb_days_to_extract = len(list(dates))
+            for idx_date, date in enumerate(dates):
+                date += timedelta(hours=self.analysis_hour)
+                logger.info(f"Begin to extract {date}")
+
+                self.send_email_at_half_execution(nb_days_to_extract, idx_date, t0)
+
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain,
+                                      self.variables_nc, self.email_address, self.delta_terms)
                 hc.download_daily_netcdf(self.start_term+1, self.end_term)
                 names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
-            logging.info(f"Extraction is finished")
+            logger.info(f"Daily netcdf are downloaded")
 
             self.concatenate_netcdf(names_netcdf)
 
             send_email("finished", self.email_address,
                        config_user=str(self.config_user),
                        current_time=time.asctime(),
-                       time_to_download=str(np.round((time.time()-t0) / 60, 2)),
+                       time_to_download=str(np.round((time.time()-t0) / 3600, 2)),
                        errors=str(self.errors),
                        folder=self.folder)
+            logger.info("The extraction is finished")
 
         except Exception as e:
+            logger.critical("The extraction stopped")
             send_email("script_stopped", self.email_address,
                        config_user=self.config_user,
                        current_time=time.asctime(),
@@ -332,12 +368,13 @@ class Extractor:
 class HendrixConductor:
     """This class extract single fa files and returns daily netcdf files"""
 
-    def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address):
+    def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address, delta_terms):
         self.folder = folder
         self.analysis_time = analysis_time
         self.model_name = model_name
         self.domain = domains[domain]
         self.email_address = email_address
+        self.delta_terms = delta_terms
         self.transformations = {
                 key: value
                 for key, value in transformations.items()
@@ -363,18 +400,19 @@ class HendrixConductor:
         i = 0
         while i < 10:
             try:
+                logger.debug("Start get_resources method from usevortex")
                 return usevortex.get_resources(getmode='epygram', **resource_description)
             except Exception as e:
-                logging.error("An exception has occured when using usevortex.get_resources command")
-                logging.error(f"The exception raised is: {e}")
-                logging.error("Exception at this stage can occur if Hendrix server is not accessible")
+                logger.error("An exception has occured when using usevortex.get_resources command")
+                logger.error(f"The exception raised is: {e}")
+                logger.error("Exception at this stage can occur if Hendrix server is not accessible")
 
                 one_hour = 3600
                 thirty_minutes = 1800
 
                 if i < 5:
-                    logging.error("We will try accessing the resource again in 30 minutes")
-                    logging.error(f"Number of try: {i+1}/10")
+                    logger.error("We will try accessing the resource again in 30 minutes")
+                    logger.error(f"Number of try: {i+1}/10")
                     time.sleep(thirty_minutes)
 
                     send_email("problem_extraction", self.email_address,
@@ -387,8 +425,8 @@ class HendrixConductor:
                                time_waiting=str(30))
                     i += 1
                 elif 5 <= i < 9:
-                    logging.error("We will try accessing the resource again in 1h")
-                    logging.error(f"Number of try: {i + 1}/10")
+                    logger.error("We will try accessing the resource again in 1h")
+                    logger.error(f"Number of try: {i+1}/10")
 
                     time.sleep(one_hour)
                     send_email("problem_extraction", self.email_address,
@@ -471,12 +509,12 @@ class HendrixConductor:
     def delete_cache_folder(self):
         """Delete temporary cache folder"""
         shutil.rmtree(self.cache_folder, ignore_errors=True)
-        logging.debug("Deleted temporary folder")
+        logger.debug("Deleted temporary folder")
 
     def delete_temporary_fa_file(self):
         """Delete temporary fa file"""
         os.remove(os.path.join(self.folder, 'tmp_file.fa'))
-        logging.debug("Deleted temporary fa file")
+        logger.debug("Deleted temporary fa file")
 
     @staticmethod
     def transform_spectral_field_if_required(field):
@@ -536,15 +574,15 @@ class HendrixConductor:
                         variable = alternatives_names.pop(0)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
-                        logging.warning(f"Found an alternative name for {initial_name} that works: {variable}")
+                        logger.warning(f"Found an alternative name for {initial_name} that works: {variable}")
                         return field
                     except AssertionError:
-                        logging.error(f"Alternative name {variable} didn't work for variable {initial_name}")
+                        logger.error(f"Alternative name {variable} didn't work for variable {initial_name}")
                         pass
-                logging.error(f"We coulnd't find correct alternative names for {initial_name}")
+                logger.error(f"We coulnd't find correct alternative names for {initial_name}")
                 raise CanNotReadEpygramField(f"We coulnd't find correct alternative names for {initial_name}")
             else:
-                logging.error(f"We couldn't read {initial_name}")
+                logger.error(f"We couldn't read {initial_name}")
                 raise CanNotReadEpygramField(f"We couldn't read {initial_name}")
 
     def add_metadate_necessary_to_surfex(self, name_netcdf_file):
@@ -568,6 +606,10 @@ class HendrixConductor:
         """Builds a single netcdf file corresponding to a single fa file."""
         self.create_cache_folder_if_doesnt_exist()
         input_resource = self.get_resource_from_hendrix(term)
+
+        # Debug
+        print(input_resource.listfields())
+
         netcdf_filename = self.get_netcdf_filename_in_cache(term)
         output_resource = epygram.formats.resource(netcdf_filename, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
@@ -581,7 +623,7 @@ class HendrixConductor:
         #todo implement this function
         self.add_metadate_necessary_to_surfex(netcdf_filename)
         self.write_time_fa_in_txt_file(field)
-        logging.debug(f"Successfully converted a fa file to netcdf for term {term}")
+        logger.debug(f"Successfully converted a fa file to netcdf for term {term}")
 
     def netcdf_in_cache_to_dict(self, start_term, end_term):
         """
@@ -596,7 +638,7 @@ class HendrixConductor:
         variable1, variable2 are elements in the list "variables".
         """
         dict_data = defaultdict(lambda: defaultdict(dict))
-        for term in range(start_term-1, end_term+1):
+        for term in range(start_term-1, end_term+1, self.delta_terms):
             filename = self.get_netcdf_filename_in_cache(term)
             nc_file = xr.open_dataset(filename)
             dict_from_xarray = nc_file.to_dict()
@@ -616,7 +658,7 @@ class HendrixConductor:
                 variable_array = compute(input_dict, term, *name_variables_fa, **kwargs)
                 output_dict[variable_nc]["data"].append(variable_array)
             else:
-                output_dict[variable_nc]["data"].append(input_dict[name_variables_fa])
+                output_dict[variable_nc]["data"].append(input_dict[term][name_variables_fa[0]])
 
         return output_dict
 
@@ -633,18 +675,19 @@ class HendrixConductor:
 
     @timer_decorator("download daily netcdf", unit='minute', level="__")
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
-        """Downloads a single day"""
-        for term in range(start_term-1, end_term+1):
-            logging.debug(f"Begin to download term {term}")
+        """Downloads a netcdf file for a single day between start_term and end_term"""
+        for term in range(start_term-1, end_term+1, self.delta_terms):
+            logger.debug(f"Begin to download term {term}")
             self.fa_to_netcdf(term)
+        logger.debug(f"Terms converted to netcdf")
 
         dict_data = self.netcdf_in_cache_to_dict(start_term, end_term)
 
         post_processed_data = defaultdict(lambda: defaultdict(list))
-        for term in range(start_term, end_term+1):
+        for term in range(start_term, end_term+1, self.delta_terms):
             post_processed_data = self.post_process(dict_data, post_processed_data, term, **kwargs)
+        logger.debug("Successfully postprocessed data in nested dictionary")
 
-        logging.debug("Successfully postprocessed data in nested dictionary")
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()

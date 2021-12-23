@@ -19,12 +19,16 @@ def compute_decumul(dict_data, term, name_variable_FA, time_delta=3600, **kwargs
     #              - from J/m2 to W/m2 for incoming LW and SW
 
     """
-    delta = read_dict(dict_data, term, name_variable_FA) - read_dict(dict_data, term -1, name_variable_FA)
+    delta = read_dict(dict_data, term, name_variable_FA) - read_dict(dict_data, term-1, name_variable_FA)
     return delta / time_delta
 
 
 def compute_psurf(dict_data, term, name_variable_FA, **kwargs):
     return np.exp(read_dict(dict_data, term, name_variable_FA))
+
+
+def compute_temperature_in_degree_c(dict_data, term, name_variable_FA, **kwargs):
+    return read_dict(dict_data, term, name_variable_FA) - 273.15
 
 
 def compute_wind_speed(dict_data, term, name_u_component_fa, name_v_component_fa, **kwargs):
@@ -57,3 +61,9 @@ def compute_SCA_SWdown(dict_data, term, name_surfrayt_sola_de_FA, name_surfrayt_
     surfrayt_sola_de = compute_decumul(dict_data, term, name_surfrayt_sola_de_FA)
     name_surfrayt_dir_sur = compute_decumul(dict_data, term, name_surfrayt_dir_sur_FA)
     return surfrayt_sola_de - name_surfrayt_dir_sur
+
+
+def compute_latent_heat_flux(dict_data, term, name_evaporation_FA, name_sublimation_FA, **kwargs):
+    evaporation = compute_decumul(dict_data, term, name_evaporation_FA)
+    sublimation = compute_decumul(dict_data, term, name_sublimation_FA)
+    return evaporation + sublimation

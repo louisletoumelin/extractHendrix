@@ -5,11 +5,11 @@ transformations = {
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],#CLSTEMPERATURE
                         grib_field_required=['CLSTEMPERATURE'],
-                        compute=None,
+                        compute="compute_temperature_in_degree_c",
                         details_original_field="2 m Temperature"),
                'T1':
                    dict(fa_fields_required=['S090TEMPERATURE'],
-                        compute=None,
+                        compute="compute_temperature_in_degree_c",
                         details_original_field="Prognostic lowest level temperature"),
 
                # todo 1/3: Isabelle used the prognostic humidity and stored it in Qair. Now prognostic humidity is Q1. We
@@ -28,13 +28,12 @@ transformations = {
                'ts':
                    dict(fa_fields_required=['SURFTEMPERATURE'],
                         compute=None,
-                        details_original_field="Ts (the one used in radiation)"),
+                        details_original_field="Surface temperature. Ts (the one used in radiation)"),
 
                'Wind':
                    dict(fa_fields_required=['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
                         compute="compute_wind_speed",
-                        details_original_field="10 m wind"),
-
+                        details_original_field="10 m wind speed"),
 
                'Wind_Gust':
                    # Wind gust name has changed few years ago
@@ -79,9 +78,101 @@ transformations = {
                          details_original_field="Snowfall = Cumulative snow + graupel"),
 
                'SCA_SWdown':
+               # todo check decumul
                    dict(fa_fields_required=['SURFRAYT SOLA DE', 'SURFRAYT DIR SUR'],
                         compute="compute_SCA_SWdown",
-                        details_original_field="SURFRAYT SOLA DE = Cum. Downward solarflux at surface"),
+                        details_original_field="SURFRAYT SOLA DE = Cum. Downward solar flux at surface"),
+
+
+
+
+
+
+
+
+
+               'TOA_SWnet':
+                    dict(fa_fields_required=['SOMMFLU.RAY.SOLA'],
+                         compute="compute_decumul",
+                         details="Cum. net solar flux top of atm."),
+               'SWnet':
+                    dict(fa_fields_required=['SURFFLU.RAY.SOLA'],
+                         compute="compute_decumul",
+                         details="Cum. net solar flux at surface"),
+               'TOA_LWnet':
+                    dict(fa_fields_required=['SOMMFLU.RAY.THER'],
+                         compute="compute_decumul",
+                         details="Cum. net IR flux top of atm."),
+               'LWnet':
+                    dict(fa_fields_required=['SURFFLU.RAY.THER'],
+                         compute="compute_decumul",
+                         details="Cum. net IR flux at surface"),
+               'LHF':
+                    dict(fa_fields_required=['SURFFLU.LAT.MEVA', 'SURFFLU.LAT.MSUB'],
+                         compute="compute_latent_heat_flux",
+                         details="LHF =SURFFLU.LAT.MEVA' + 'SURFFLU.LAT.MSUB'"),
+               'SHF':
+                    dict(fa_fields_required=['SURFFLU.CHA.SENS'],
+                         compute="compute_decumul",
+                         details="Cum.Sensible heat flux"),
+
+               'Tmin':
+                    dict(fa_fields_required=['CLSMINI.TEMPERAT'],
+                         compute="compute_temperature_in_degree_c",
+                         details="T2m mini since last output file"),
+               'Tmax':
+                    dict(fa_fields_required=['CLSMAXI.TEMPERAT'],
+                         compute="compute_temperature_in_degree_c",
+                         details="T2m maxi since last output file"),
+               'RH2m':
+                    dict(fa_fields_required=['CLSHUMI.RELATIVE'],
+                         compute=None,
+                         details=" 	2m relative humidity"),
+               'CC_inst':
+                    dict(fa_fields_required=['SURFNEBUL.TOTALE'],
+                         compute=None,
+                         details="Inst. Total nebulosity"),
+               'CC_inst_low':
+                    dict(fa_fields_required=['SURFNEBUL.BASSE'],
+                         compute=None,
+                         details="Inst. Low nebulosity"),
+               'CC_inst_middle':
+                    dict(fa_fields_required=['SURFNEBUL.MOYENN'],
+                         compute=None,
+                         details="Inst. Middle nebulosity"),
+               'CC_inst_high':
+                    dict(fa_fields_required=['SURFNEBUL.HAUTE'],
+                         compute=None,
+                         details="Inst. High nebulosity"),
+               'CC_decumul':
+                    dict(fa_fields_required=['ATMONEBUL.TOTALE'],
+                         compute="compute_decumul",
+                         details="Cum. total nebulosity"),
+               'BLH':
+                    dict(fa_fields_required=['CLPMHAUT.MOD.XFU'],
+                         compute=None,
+                         details="Boudary Layer Height (m)"),
+               'clear_sky_SWnet':
+                    dict(fa_fields_required=['SnnnRAYT SOL CL'],
+                         compute=None,
+                         details="Net Clear sky surf solar radiation"),
+               'clear_sky_LWnet':
+                    dict(fa_fields_required=['SnnnRAYT THER CL'],
+                         compute=None,
+                         details="Net Clear sky surf thermal radiation"),
+               'SWD':
+               # todo check decumul
+
+                   dict(fa_fields_required=['SURFRAYT SOLA DE'],
+                         compute=None,
+                         details="Cum. Downward solarflux at surface"),
+               'LWD':
+               # todo check decumul
+                   dict(fa_fields_required=['SURFRAYT THER DE'],
+                         compute=None,
+                         details="Cum. Downward IR at surface"),
+
+
                }
 
 alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
