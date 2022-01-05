@@ -12,12 +12,17 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
 import logging
+import itertools
+import copy
+import warnings
 
 logger_epygram = logging.getLogger('epygram')
 logger_epygram.setLevel(level=logging.CRITICAL)
 
 logger_vortex = logging.getLogger('vortex')
 logger_vortex.setLevel(level=logging.CRITICAL)
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import numpy as np
 import xarray as xr
@@ -58,12 +63,26 @@ def timer_decorator(argument, unit='minute', level="__"):
     return decorator
 
 
-def get_model_description(model_name):
-    """Get vortex description of a model"""
+def model_ini_to_dict(model_name):
     config = configparser.ConfigParser()
     models_path = pkg_resources.resource_filename('extracthendrix.config', 'models.ini')
     config.read(models_path)
-    return dict(config[model_name])
+    dict_model = dict(config[model_name])
+    return dict_model
+
+
+def get_model_description(model_name):
+    """Get vortex description of a model"""
+
+    dict_model = model_ini_to_dict(model_name)
+
+    for key in dict_model.keys():
+        dict_model[key] = dict_model[key].split(',')
+
+    keys, values = zip(*dict_model.items())
+    list_dict_models = [dict(zip(keys, v)) for v in itertools.product(*values)]
+
+    return list_dict_models
 
 
 def get_name_from_email(email_address):
@@ -92,9 +111,9 @@ def send_email(type_of_email, email_address, **kwargs):
 
     try:
         server.sendmail(from_addr, to_addrs, msg.as_string())
-        logger.info(f"Successfully sent an email to {to_addrs}")
+        logger.info(f"Successfully sent an email to {to_addrs}\n\n")
     except smtplib.SMTPException as e:
-        logger.error(f"Email {type_of_email} could not be launched. The error is: {e}")
+        logger.error(f"Email {type_of_email} could not be launched. The error is: {e}\n\n")
 
     server.quit()
 
@@ -113,6 +132,10 @@ def callSystemOrDie(commande, errorcode=None):
 
 
 class CanNotReadEpygramField(Exception):
+    pass
+
+
+class CanNotAccessVortexResource(Exception):
     pass
 
 
@@ -162,6 +185,9 @@ class Extractor:
         self.final_concatenation = config_user.get("final_concatenation")
         self.errors = dict()
         self.config_user = config_user
+
+    def __repr__(self):
+        return f"Extractor with following parameters {self.config_user}"
 
     @staticmethod
     def date_iterator(date_start, date_end):
@@ -249,7 +275,7 @@ class Extractor:
             condition_year = dataset["time.year"] == year
             filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}_{month}.nc")
             dataset.where(condition_month & condition_year, drop=True).to_netcdf(filename)
-        logger.info("Concatenation by year and month worked")
+        logger.info("Concatenation by year and month worked\n\n")
 
     def _concatenate_netcdf_by_year(self, dataset):
         """Internal method to concatenated a xarray dataset composed of daily files into individual files by year"""
@@ -259,7 +285,7 @@ class Extractor:
             condition_year = dataset["time.year"] == year
             filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_{year}.nc")
             dataset.where(condition_year, drop=True).to_netcdf(filename)
-        logger.info("Concatenation by year worked")
+        logger.info("Concatenation by year worked\n\n")
 
     def _concatenate_all_netcdf(self, dataset):
         """Internal method to concatenate daily files into a single netcdf file"""
@@ -267,7 +293,7 @@ class Extractor:
         end_str = self.date_end.strftime('%Y%m%d_%Hh')
         filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_from_{start_str}_to_{end_str}.nc")
         dataset.to_netcdf(filename)
-        logger.info("Concatenation worked")
+        logger.info("Concatenation worked\n\n")
 
 
     def prepare_prestaging_demand(self):
@@ -312,12 +338,12 @@ class Extractor:
                        folder=self.folder)
 
     def _extract_initial_term(self):
-        logger.info(f"Begin to extract initial term {self.start_term - 1} of first date {self.date_start}")
+        logger.info(f"Begin to extract initial term {self.start_term - 1} of first date {self.date_start}\n\n")
         hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain,
                               self.variables_nc, self.email_address, self.delta_terms)
         hc.download_daily_netcdf(self.start_term, self.start_term)
         name_initial_netcdf = hc.generate_name_output_netcdf(self.start_term, self.start_term)
-        logger.info("Initial term extracted")
+        logger.info("Initial term extracted\n\n")
         return name_initial_netcdf
 
     def download(self):
@@ -335,7 +361,7 @@ class Extractor:
             nb_days_to_extract = len(list(dates))
             for idx_date, date in enumerate(dates):
                 date += timedelta(hours=self.analysis_hour)
-                logger.info(f"Begin to extract {date}")
+                logger.info(f"Begin to extract {date}\n\n")
 
                 self.send_email_at_half_execution(nb_days_to_extract, idx_date, t0)
 
@@ -343,7 +369,7 @@ class Extractor:
                                       self.variables_nc, self.email_address, self.delta_terms)
                 hc.download_daily_netcdf(self.start_term+1, self.end_term)
                 names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
-            logger.info(f"Daily netcdf are downloaded")
+            logger.info(f"Daily netcdf are downloaded\n\n")
 
             self.concatenate_netcdf(names_netcdf)
 
@@ -353,10 +379,10 @@ class Extractor:
                        time_to_download=str(np.round((time.time()-t0) / 3600, 2)),
                        errors=str(self.errors),
                        folder=self.folder)
-            logger.info("The extraction is finished")
+            logger.info("The extraction is finished\n\n")
 
         except Exception as e:
-            logger.critical("The extraction stopped")
+            logger.critical("The extraction stopped\n\n")
             send_email("script_stopped", self.email_address,
                        config_user=self.config_user,
                        current_time=time.asctime(),
@@ -382,6 +408,13 @@ class HendrixConductor:
         self.getter = self.parse_getter(getter)
         self.cache_folder = self.generate_name_of_cache_folder()
         self.variables_fa = self.get_fa_variables_names()
+        self.contains_surface_variables = self.check_for_surface_variables()
+
+    def check_for_surface_variables(self):
+        if any([self.transformations[variable_nc]["surface_variable"] for variable_nc in self.transformations]):
+            return True
+        else:
+            return False
 
     def parse_getter(self, getter):
         """
@@ -395,62 +428,91 @@ class HendrixConductor:
         else:
             raise NotImplementedError
 
-    def _get_resources_vortex(self, resource_description):
+    def _sleep_and_send_mail(self, nb_of_try, time_to_sleep, resource_description, error):
+
+        if time_to_sleep == "30min":
+            time_str_logging = "30 minutes"
+            time_str_mail = "30"
+            seconds_to_sleep = 1800
+        elif time_to_sleep in ["1h", "60min"]:
+            time_str_logging = "1 hour"
+            time_str_mail = "60"
+            seconds_to_sleep = 3600
+
+        logger.error(f"We will try accessing the resource again in {time_str_logging}\n\n")
+        logger.error(f"Number of try: {nb_of_try + 1}/10\n\n")
+        time.sleep(seconds_to_sleep)
+
+        send_email("problem_extraction", self.email_address,
+                   user=get_name_from_email(self.email_address),
+                   error_message=error,
+                   time_of_problem=time.asctime(),
+                   resource_that_stopped=str(resource_description),
+                   folder=self.folder,
+                   nb_of_try=str(nb_of_try + 1),
+                   time_waiting=time_str_mail)
+
+    def _get_resources_vortex(self, resource_descriptions_init):
         """Internal method that access files on Hendrix. Based on Epygram "use_vortex" function."""
+        assert isinstance(resource_descriptions_init, list)
+        assert resource_descriptions_init
+
         i = 0
         while i < 10:
             try:
-                logger.debug("Start get_resources method from usevortex")
-                return usevortex.get_resources(getmode='epygram', **resource_description)
-            except Exception as e:
-                logger.error("An exception has occured when using usevortex.get_resources command")
-                logger.error(f"The exception raised is: {e}")
-                logger.error("Exception at this stage can occur if Hendrix server is not accessible")
+                resource_descriptions = copy.deepcopy(resource_descriptions_init)
+                while resource_descriptions:
+                    try:
+                        resource_description = resource_descriptions.pop()
+                        logger.debug("Start get_resources method from usevortex"
+                                     f"\nModel={resource_descriptions['model']}\n\n")
+                        return usevortex.get_resources(getmode='epygram', **resource_description)
 
-                one_hour = 3600
-                thirty_minutes = 1800
+                    except (RuntimeError, OSError) as e:
+                        logger.error(f"The following error has been encountered: \n\n{repr(e)}"
+                                     f"\n\nYour resource description is probably invalid."
+                                     "\nThis can happen if e.g. namespace is not valid."
+                                     "\nWe try to access next resource description if available."
+                                     f"\n\nInvalid resource description: {resource_description}"
+                                     f"\n\nRemaining resource descriptions: {resource_descriptions}\n\n")
+
+
+                else:
+                    logger.error("We tried to access every resource_description possible but it didn't work."
+                                 "\nPlease check that your resource_description is valid.\n\n")
+                    raise CanNotAccessVortexResource
+
+            except Exception as e:
+                logger.error("An exception has occured when using usevortex.get_resources command"
+                             f"\n\nThe exception raised is: {repr(e)}"
+                             "\n\nException at this stage can occur if Hendrix server is not accessible"
+                             f"Current resource description is {resource_description}\n\n")
 
                 if i < 5:
-                    logger.error("We will try accessing the resource again in 30 minutes")
-                    logger.error(f"Number of try: {i+1}/10")
-                    time.sleep(thirty_minutes)
-
-                    send_email("problem_extraction", self.email_address,
-                               user=get_name_from_email(self.email_address),
-                               error_message=e,
-                               time_of_problem=time.asctime(),
-                               resource_that_stopped=str(resource_description),
-                               folder=self.folder,
-                               nb_of_try=str(i+1),
-                               time_waiting=str(30))
+                    self._sleep_and_send_mail(i, "30min", resource_description, e)
                     i += 1
                 elif 5 <= i < 9:
-                    logger.error("We will try accessing the resource again in 1h")
-                    logger.error(f"Number of try: {i+1}/10")
-
-                    time.sleep(one_hour)
-                    send_email("problem_extraction", self.email_address,
-                               user=get_name_from_email(self.email_address),
-                               error_message=e,
-                               time_of_problem=time.asctime(),
-                               resource_that_stopped=str(resource_description),
-                               folder=self.folder,
-                               nb_of_try=str(i + 1),
-                               time_waiting=str(60))
+                    self._sleep_and_send_mail(i, "1h", resource_description, e)
                     i += 1
                 else:
                     raise
 
-    def get_resource_from_hendrix(self, term):
+    def get_resource_from_hendrix(self, term, model_name=None):
         """function that accesses resources on hendrix. Based on Epygram "use_vortex" function."""
-        resource_description = dict(
-            **get_model_description(self.model_name),
+
+        model_name = self.model_name if model_name is None else model_name
+        model_descriptions = get_model_description(model_name)
+        assert isinstance(model_descriptions, list)
+        assert isinstance(model_descriptions[0], dict)
+
+        resource_descriptions = [dict(
+            **model_description,
             date=self.analysis_time,
             term=term,
             local=os.path.join(self.folder, 'tmp_file.fa')
-        )
+        ) for model_description in model_descriptions]
 
-        resource = self._get_resources_vortex(resource_description)
+        resource = self._get_resources_vortex(resource_descriptions)
         resource = resource[0] if isinstance(resource, list) else resource
 
         return resource
@@ -509,12 +571,12 @@ class HendrixConductor:
     def delete_cache_folder(self):
         """Delete temporary cache folder"""
         shutil.rmtree(self.cache_folder, ignore_errors=True)
-        logger.debug("Deleted temporary folder")
+        logger.debug("Deleted temporary folder\n\n")
 
     def delete_temporary_fa_file(self):
         """Delete temporary fa file"""
         os.remove(os.path.join(self.folder, 'tmp_file.fa'))
-        logger.debug("Deleted temporary fa file")
+        logger.debug("Deleted temporary fa file\n\n")
 
     @staticmethod
     def transform_spectral_field_if_required(field):
@@ -574,15 +636,15 @@ class HendrixConductor:
                         variable = alternatives_names.pop(0)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
-                        logger.warning(f"Found an alternative name for {initial_name} that works: {variable}")
+                        logger.warning(f"Found an alternative name for {initial_name} that works: {variable}\n\n")
                         return field
                     except AssertionError:
-                        logger.error(f"Alternative name {variable} didn't work for variable {initial_name}")
+                        logger.error(f"Alternative name {variable} didn't work for variable {initial_name}\n\n")
                         pass
-                logger.error(f"We coulnd't find correct alternative names for {initial_name}")
-                raise CanNotReadEpygramField(f"We coulnd't find correct alternative names for {initial_name}")
+                logger.error(f"We coulnd't find correct alternative names for {initial_name}\n\n")
+                raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
             else:
-                logger.error(f"We couldn't read {initial_name}")
+                logger.error(f"We couldn't read {initial_name}\n\n")
                 raise CanNotReadEpygramField(f"We couldn't read {initial_name}")
 
     def add_metadate_necessary_to_surfex(self, name_netcdf_file):
@@ -601,20 +663,33 @@ class HendrixConductor:
         """
         pass
 
+    def get_fa_names_of_surface_variables(self):
+        surface_variables_fa = []
+        for variable_nc in self.transformations:
+            if self.transformations[variable_nc].get("surface_variable"):
+                surface_variables_fa.extend(self.transformations[variable_nc]["fa_fields_required"])
+        return surface_variables_fa
+
     @timer_decorator("fa_to_netcdf", unit='minute', level="____")
     def fa_to_netcdf(self, term):
         """Builds a single netcdf file corresponding to a single fa file."""
         self.create_cache_folder_if_doesnt_exist()
-        input_resource = self.get_resource_from_hendrix(term)
 
-        # Debug
-        print(input_resource.listfields())
+        input_resource = self.get_resource_from_hendrix(term)
 
         netcdf_filename = self.get_netcdf_filename_in_cache(term)
         output_resource = epygram.formats.resource(netcdf_filename, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
+
+        if self.contains_surface_variables:
+            surface_resource = self.get_resource_from_hendrix(term, model_name=self.model_name+"_SURFACE")
+            surface_variables_fa = self.get_fa_names_of_surface_variables()
+        else:
+            surface_variables_fa = []
+
         for variable in self.variables_fa:
-            field = self.read_epygram_field(input_resource, variable)
+            resource = surface_resource if variable in surface_variables_fa else input_resource
+            field = self.read_epygram_field(resource, variable)
             field = self.pass_fa_metadata_to_netcdf(field)
             field = self.transform_spectral_field_if_required(field)
             field = self.extract_domain_pixels(field)
@@ -622,8 +697,9 @@ class HendrixConductor:
 
         #todo implement this function
         self.add_metadate_necessary_to_surfex(netcdf_filename)
+
         self.write_time_fa_in_txt_file(field)
-        logger.debug(f"Successfully converted a fa file to netcdf for term {term}")
+        logger.debug(f"Successfully converted a fa file to netcdf for term {term}\n\n")
 
     def netcdf_in_cache_to_dict(self, start_term, end_term):
         """
@@ -677,16 +753,16 @@ class HendrixConductor:
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
         """Downloads a netcdf file for a single day between start_term and end_term"""
         for term in range(start_term-1, end_term+1, self.delta_terms):
-            logger.debug(f"Begin to download term {term}")
+            logger.debug(f"Begin to download term {term}\n\n")
             self.fa_to_netcdf(term)
-        logger.debug(f"Terms converted to netcdf")
+        logger.debug(f"Terms converted to netcdf\n\n")
 
         dict_data = self.netcdf_in_cache_to_dict(start_term, end_term)
 
         post_processed_data = defaultdict(lambda: defaultdict(list))
         for term in range(start_term, end_term+1, self.delta_terms):
             post_processed_data = self.post_process(dict_data, post_processed_data, term, **kwargs)
-        logger.debug("Successfully postprocessed data in nested dictionary")
+        logger.debug("Successfully postprocessed data in nested dictionary\n\n")
 
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()

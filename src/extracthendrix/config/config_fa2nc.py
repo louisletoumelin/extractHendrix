@@ -5,8 +5,10 @@ transformations = {
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],#CLSTEMPERATURE
                         grib_field_required=['CLSTEMPERATURE'],
+                        surface_variable=False,
                         compute="compute_temperature_in_degree_c",
-                        details_original_field="2 m Temperature"),
+                        details_original_field="2 m Temperature"
+                        ),
                'T1':
                    dict(fa_fields_required=['S090TEMPERATURE'],
                         compute="compute_temperature_in_degree_c",
@@ -173,7 +175,101 @@ transformations = {
                          details="Cum. Downward IR at surface"),
 
 
-               }
+
+
+               'Wind90':
+                   dict(fa_fields_required=['S090WIND.U.PHYS', 'S090WIND.V.PHYS'],
+                        compute="compute_wind_speed",
+                        details_original_field="5 m wind speed"),
+
+               'Wind87':
+                   dict(fa_fields_required=['S087WIND.U.PHYS', 'S087WIND.V.PHYS'],
+                        compute="compute_wind_speed",
+                        details_original_field="50 m wind speed"),
+
+               'Wind84':
+                   dict(fa_fields_required=['S084WIND.U.PHYS', 'S084WIND.V.PHYS'],
+                        compute="compute_wind_speed",
+                        details_original_field="126 m wind speed"),
+
+               'Wind75':
+                   dict(fa_fields_required=['S075WIND.U.PHYS', 'S075WIND.V.PHYS'],
+                        compute="compute_wind_speed",
+                        details_original_field="515 m wind speed"),
+
+
+
+               'TKE90':
+                    dict(fa_fields_required=['S090TKE'],
+                         compute=None,
+                         details_original_field="5 m TKE"),
+
+               'TKE87':
+                    dict(fa_fields_required=['S087TKE'],
+                         compute=None,
+                         details_original_field="50 m TKE"),
+
+               'TKE84':
+                    dict(fa_fields_required=['S084TKE'],
+                         compute=None,
+                         details_original_field="126 m TKE"),
+
+               'TKE75':
+                    dict(fa_fields_required=['S075TKE'],
+                         compute=None,
+                         details_original_field="515 m TKE"),
+
+
+
+
+
+
+               'TT90':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="5 m TKE"),
+
+               'TT87':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="50 m TKE"),
+
+               'TT84':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="126 m TKE"),
+
+               'TT75':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="515 m TKE"),
+
+
+
+
+
+
+               'TT90':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="5 m TKE"),
+
+               'TT87':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="50 m TKE"),
+
+               'TT84':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="126 m TKE"),
+
+               'TT75':
+                    dict(fa_fields_required=['S090TEMPERATURE'],
+                         compute=None,
+                         details_original_field="515 m TKE"),
+
+}
 
 alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
                          'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU']}
