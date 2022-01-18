@@ -295,7 +295,6 @@ class Extractor:
         dataset.to_netcdf(filename)
         logger.info("Concatenation worked\n\n")
 
-
     def prepare_prestaging_demand(self):
         """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
         dates = self.date_iterator(self.date_start, self.date_end)
@@ -312,8 +311,9 @@ class Extractor:
             for date in dates:
                 hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address, self.delta_terms)
                 for term in range(self.start_term, self.end_term, self.delta_terms):
-                    resource = hc.get_path_vortex_ressource(term)[0]
-                    f.write(resource.split(':')[1] + "\n")
+                    resources = hc.get_path_vortex_ressource(term)
+                    for resource in resources:
+                        f.write(resource[0].split(':')[1] + "\n")
 
         info_prestaging = "\n\nPlease find below the procedure for prestaging. \
         Note a new file named 'request_prestaging_*.txt' has been created on your current folder\n\n1. \
@@ -411,7 +411,7 @@ class HendrixConductor:
         self.contains_surface_variables = self.check_for_surface_variables()
 
     def check_for_surface_variables(self):
-        if any([self.transformations[variable_nc]["surface_variable"] for variable_nc in self.transformations]):
+        if any([self.transformations[variable_nc].get("surface_variable") for variable_nc in self.transformations]):
             return True
         else:
             return False
@@ -464,8 +464,8 @@ class HendrixConductor:
                 while resource_descriptions:
                     try:
                         resource_description = resource_descriptions.pop()
-                        logger.debug("Start get_resources method from usevortex"
-                                     f"\nModel={resource_descriptions['model']}\n\n")
+                        #logger.debug("Start get_resources method from usevortex"
+                        #             f"\nModel={resource_descriptions['model']}\n\n")
                         return usevortex.get_resources(getmode='epygram', **resource_description)
 
                     except (RuntimeError, OSError) as e:
@@ -551,14 +551,27 @@ class HendrixConductor:
         netcdf_filename = "%s_ana_%s_term_%s.nc"%(self.model_name, analysis_time_str, term)
         return os.path.join(self.cache_folder, netcdf_filename)
 
-    def get_path_vortex_ressource(self, term):
+    def get_path_vortex_ressource(self, term, model_name=None):
         """Returns the path of a vortex resource (typically a single fa file) on Hendrix"""
-        resource_description = dict(
-                **get_model_description(self.model_name),
-                date=self.analysis_time,
-                term=term,
-                local='tmp_file.fa')
-        return usevortex.get_resources(getmode='locate', **resource_description)
+        #resource_description = dict(
+        #        **get_model_description(self.model_name),
+        #        date=self.analysis_time,
+        #        term=term,
+        #        local='tmp_file.fa')
+
+        model_name = self.model_name if model_name is None else model_name
+        model_descriptions = get_model_description(model_name)
+        assert isinstance(model_descriptions, list)
+        assert isinstance(model_descriptions[0], dict)
+
+        resource_descriptions = [dict(
+            **model_description,
+            date=self.analysis_time,
+            term=term,
+            local=os.path.join(self.folder, 'tmp_file.fa')
+        ) for model_description in model_descriptions]
+
+        return [usevortex.get_resources(getmode='locate', **resource_description) for resource_description in resource_descriptions]
 
     def create_cache_folder_if_doesnt_exist(self):
         """
@@ -674,7 +687,6 @@ class HendrixConductor:
     def fa_to_netcdf(self, term):
         """Builds a single netcdf file corresponding to a single fa file."""
         self.create_cache_folder_if_doesnt_exist()
-
         input_resource = self.get_resource_from_hendrix(term)
 
         netcdf_filename = self.get_netcdf_filename_in_cache(term)
