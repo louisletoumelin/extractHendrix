@@ -1,0 +1,11 @@
+# requirements pour installation d'un evironnement virtuel de dev sur sxcen
+# les librairies listées ici sont celles dont l'absence fait planter le code, en utilisant les mêmes versions que sur l'environnement par défaut de sxcen
+# ce sont des dépendances de snowtools, vortex ou epygram, donc ça n'a pas trop de sens de les mettre dans le setup.py du projet
+# enfin, on évite l'approche d'un pip freeze global sur l'environnement de sxcen, car il y a des tas de librairies que pip ne trouve pas (pourquoi??)
+
+
+numpy==1.17.4
+xarray==0.15.0
+matplotlib==3.1.2
+pyyaml
+
