@@ -179,9 +179,12 @@ class Extractor:
         self.date_start = config_user.get("date_start") + timedelta(hours=self.analysis_hour)
         self.date_end = config_user.get("date_end") + timedelta(hours=self.analysis_hour)
         self.email_address = config_user.get("email_address")
-        self.start_term = config_user.get("start_term")
-        self.end_term = config_user.get("end_term")
+        self.start_term = config_user.get("start_term", 6)
+        self.end_term = config_user.get("end_term", 30)
         self.delta_terms = config_user.get("delta_terms")
+        self.concat_mode = config_user.get("concat_mode", "timeseries")
+        if self.concat_mode not in ["timeseries", "forecast"]:
+            raise NotImplementedError("invalid concat_mode. Please choose timeseeries or forecast")
         self.final_concatenation = config_user.get("final_concatenation")
         self.errors = dict()
         self.config_user = config_user
@@ -247,23 +250,29 @@ class Extractor:
 
     def concatenate_netcdf(self, list_daily_netcdf_files):
         """Concatenates files according to desired output shape"""
-        try:
-            dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
-        except:
-            self.errors["concatenation"] = "Files are not concatenated with the desired final format \n" \
-                                           "We could not read all file at once using xarray. " \
-                                           "This is likely due to the fact that the number of point in your domain" \
-                                           "varies with time (e.g. +/- 1 pixel)"
-            return
+        if self.concat_mode == "timeseries":
+            try:
+                dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+            except:
+                self.errors["concatenation"] = "Files are not concatenated with the desired final format \n" \
+                                               "We could not read all file at once using xarray. " \
+                                               "This is likely due to the fact that the number of point in your domain" \
+                                               "varies with time (e.g. +/- 1 pixel)"
+                return
 
-        if self.final_concatenation == "month":
-            self._concatenate_netcdf_by_year_and_month(dataset)
-        elif self.final_concatenation == "year":
-            self._concatenate_netcdf_by_year(dataset)
-        elif self.final_concatenation == "all":
-            self._concatenate_all_netcdf(dataset)
+            if self.final_concatenation == "month":
+                self._concatenate_netcdf_by_year_and_month(dataset)
+            elif self.final_concatenation == "year":
+                self._concatenate_netcdf_by_year(dataset)
+            elif self.final_concatenation == "all":
+                self._concatenate_all_netcdf(dataset)
+            else:
+                return
+        elif self.concat_mode == "forecast":
+            # todo: implement concatenation
+            pass
         else:
-            return
+            raise NotImplementedError("concatenation mode ", self.concat_mode, "not implemented")
 
     def _concatenate_netcdf_by_year_and_month(self, dataset):
         """Internal method to concatenated a xarray dataset composed of daily files into individual
@@ -289,8 +298,10 @@ class Extractor:
 
     def _concatenate_all_netcdf(self, dataset):
         """Internal method to concatenate daily files into a single netcdf file"""
-        start_str = self.date_start.strftime('%Y%m%d_%Hh')
-        end_str = self.date_end.strftime('%Y%m%d_%Hh')
+        start_str = (self.date_start + timedelta(hours=self.analysis_hour)
+                     + timedelta(hours=self.start_term)).strftime('%Y%m%d_%Hh')
+        end_str = (self.date_end + timedelta(hours=self.analysis_hour)
+                   + timedelta(hours=self.end_term)).strftime('%Y%m%d_%Hh')
         filename = os.path.join(self.folder, f"{self.model_name}_{self.domain}_from_{start_str}_to_{end_str}.nc")
         dataset.to_netcdf(filename)
         logger.info("Concatenation worked\n\n")
@@ -348,6 +359,9 @@ class Extractor:
 
     def download(self):
         """Download data"""
+        logger.info(f"self terms: {self.start_term} {self.end_term}")
+        if self.concat_mode == "timeseries" and (self.end_term - self.start_term) != 23:
+            logger.warning("end_term - start_term should be equal to 24h when concat_mode is timeseries.")
         try:
             t0 = time.time()
             print_link_to_confluence_table_with_downloaded_data()
@@ -355,20 +369,20 @@ class Extractor:
             dates = self.date_iterator(self.date_start, self.date_end)
             names_netcdf = []
 
-            name_initial_netcdf = self._extract_initial_term()
-            names_netcdf.append(name_initial_netcdf)
+            # name_initial_netcdf = self._extract_initial_term()  # interesting functionality for testing with a minimum of files
+            # names_netcdf.append(name_initial_netcdf)
 
-            nb_days_to_extract = len(list(dates))
+            # nb_days_to_extract = len(list(dates))  # !!! attention !!! consumes the iterator !
             for idx_date, date in enumerate(dates):
                 date += timedelta(hours=self.analysis_hour)
                 logger.info(f"Begin to extract {date}\n\n")
 
-                self.send_email_at_half_execution(nb_days_to_extract, idx_date, t0)
+                # self.send_email_at_half_execution(nb_days_to_extract, idx_date, t0)
 
                 hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain,
                                       self.variables_nc, self.email_address, self.delta_terms)
-                hc.download_daily_netcdf(self.start_term+1, self.end_term)
-                names_netcdf.append(hc.generate_name_output_netcdf(self.start_term+1, self.end_term))
+                hc.download_daily_netcdf(self.start_term, self.end_term)
+                names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.end_term))
             logger.info(f"Daily netcdf are downloaded\n\n")
 
             self.concatenate_netcdf(names_netcdf)
@@ -765,6 +779,7 @@ class HendrixConductor:
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
         """Downloads a netcdf file for a single day between start_term and end_term"""
         for term in range(start_term-1, end_term+1, self.delta_terms):
+            print(start_term, end_term, self.delta_terms, term)
             logger.debug(f"Begin to download term {term}\n\n")
             self.fa_to_netcdf(term)
         logger.debug(f"Terms converted to netcdf\n\n")
@@ -777,7 +792,7 @@ class HendrixConductor:
         logger.debug("Successfully postprocessed data in nested dictionary\n\n")
 
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
-        self.delete_cache_folder()
+        # self.delete_cache_folder()
         self.delete_temporary_fa_file()
 
 
