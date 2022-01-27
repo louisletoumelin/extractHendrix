@@ -186,6 +186,10 @@ class Extractor:
         if self.concat_mode not in ["timeseries", "forecast"]:
             raise NotImplementedError("invalid concat_mode. Please choose timeseeries or forecast")
         self.final_concatenation = config_user.get("final_concatenation")
+        if self.concat_mode == "timeseries" and self.final_concatenation not in ["year", "month", "all"]:
+            raise NotImplementedError("invalid finale_concatenation. year, month or all available for timeseries")
+        elif self.concat_mode == "forecast" and self.final_concatenation not in ["deterministic", "ensemble"]:
+            raise NotImplementedError("invalid final_concatenation. deterministic and ensemble available for forecasts")
         self.errors = dict()
         self.config_user = config_user
 
@@ -252,7 +256,8 @@ class Extractor:
         """Concatenates files according to desired output shape"""
         if self.concat_mode == "timeseries":
             try:
-                dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files])
+                dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files],
+                                            data_vars='different')
             except:
                 self.errors["concatenation"] = "Files are not concatenated with the desired final format \n" \
                                                "We could not read all file at once using xarray. " \
@@ -361,7 +366,7 @@ class Extractor:
         """Download data"""
         logger.info(f"self terms: {self.start_term} {self.end_term}")
         if self.concat_mode == "timeseries" and (self.end_term - self.start_term) != 23:
-            logger.warning("end_term - start_term should be equal to 24h when concat_mode is timeseries.")
+            logger.warning("end_term - start_term should be equal to 23h when concat_mode is timeseries.")
         try:
             t0 = time.time()
             print_link_to_confluence_table_with_downloaded_data()
@@ -385,7 +390,8 @@ class Extractor:
                 names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.end_term))
             logger.info(f"Daily netcdf are downloaded\n\n")
 
-            self.concatenate_netcdf(names_netcdf)
+            if self.concat_mode == "timeseries":
+                self.concatenate_netcdf(names_netcdf)
 
             send_email("finished", self.email_address,
                        config_user=str(self.config_user),
@@ -746,6 +752,10 @@ class HendrixConductor:
             dict_from_xarray = nc_file.to_dict()
             for variable in self.variables_fa:
                 dict_data[term][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
+            # print(dict_from_xarray["data_vars"]["longitude"])
+        dict_data["longitude"] = dict_from_xarray["data_vars"]["longitude"]
+        dict_data["latitude"] = dict_from_xarray["data_vars"]["latitude"]
+        dict_data["Projection_parameters"] = dict_from_xarray["data_vars"]["Projection_parameters"]
         logging.debug("Successfully converted netcdf (for each term) into a nested dictionary containing numpy arrays")
         return dict_data
 
@@ -761,6 +771,9 @@ class HendrixConductor:
                 output_dict[variable_nc]["data"].append(variable_array)
             else:
                 output_dict[variable_nc]["data"].append(input_dict[term][name_variables_fa[0]])
+        output_dict["longitude"] = input_dict['longitude']
+        output_dict["latitude"] = input_dict['latitude']
+        output_dict["Projection_parameters"] = input_dict['Projection_parameters']
 
         return output_dict
 
@@ -792,7 +805,7 @@ class HendrixConductor:
         logger.debug("Successfully postprocessed data in nested dictionary\n\n")
 
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
-        # self.delete_cache_folder()
+        self.delete_cache_folder()
         self.delete_temporary_fa_file()
 
 
