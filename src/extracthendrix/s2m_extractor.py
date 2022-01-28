@@ -89,11 +89,14 @@ class S2MExtractor(S2MTaskMixIn):
         if kind=='meteo':
             self.resource_description = get_model_description('S2M_FORCING')
         if self.previ:
-            self.resource_description['cutoff']='production'
+            for description in self.resource_description:
+                description['cutoff']='production'
         else:
-            self.resource_description['cutoff']='assimilation'
-        self.resource_description['geometry'] = geometry
-        self.conf.__dict__ = self.resource_description
+            for description in self.resource_description:
+                description['cutoff']='assimilation'
+        for description in self.resource_description:
+            description['geometry']=geometry
+        self.conf.__dict__ = self.resource_description[0]
 
     def get_resource_description(self):
         return self.resource_description
@@ -118,14 +121,16 @@ class S2MExtractor(S2MTaskMixIn):
         return datebegin, dateend
 
     def get_netcdf(self, date):
-        resource_description = dict(**self.resource_description)
+        resource_description = dict(**self.resource_description[0])
         dates_begin, dates_end = self.get_dates_for_run(date)
         rundate = datetime.combine(date=date, time=self.runtime)
         anaprevi = 'previ' if self.previ else 'analyse'
+        filepaths = []
         for datebegin, dateend in zip(dates_begin, dates_end):
             rundatestr, beginstr, endstr = [date_.strftime("%Y%m%d_%Hh") for date_ in [rundate, datebegin, dateend]] 
+            filepath = os.path.join(self.folder,'%s-%s-member%s-run%s_%s_%s.nc'%(self.kind, anaprevi, self.member, rundatestr,beginstr, endstr))
             resource_description.update(
-                    local=os.path.join(self.folder,'%s-%s-member%s-run%s_%s_%s.nc'%(self.kind, anaprevi, self.member, rundatestr,beginstr, endstr)),
+                    local=filepath,
                     date= rundate,
                     datebegin=datebegin,
                     dateend=dateend,
@@ -134,6 +139,8 @@ class S2MExtractor(S2MTaskMixIn):
                     )
             tb = toolbox.input(**resource_description)
             tb[0].get()
+            filepaths.append(filepath)
+        return filepaths
 
 
 def get_s2m_netcdf(date=None, kind=None, runtime=None, previ=None, member=None):
