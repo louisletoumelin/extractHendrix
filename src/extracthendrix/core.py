@@ -234,6 +234,24 @@ class Extractor:
             mlist.append(datetime(y, m+1, 1).year)
         return list(set(mlist))
 
+    def ij2latlon(self, first_i, last_i, first_j, last_j, term=5):
+        """
+        Convert bounds of a domains in grid indexes to lat/lon
+
+        Input:
+        first_i, last_i, first_j, last_j
+
+        Return:
+        ll_lat, ll_lon: lat and lon of lower left corner (ll)
+        ur_lat, ur_lon: lat and lon of upper right corner (ur)
+        """
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address, self.delta_terms)
+        resource = hc.get_resource_from_hendrix(term)
+        field = resource.readfield('CLSTEMPERATURE')
+        ll_lat, ll_lon = field.geometry.ij2ll(first_i, first_j)
+        ur_lat, ur_lon = field.geometry.ij2ll(last_i, last_j)
+        return ll_lat, ll_lon, ur_lat, ur_lon
+
     def latlon2ij(self, ll_lat, ll_lon, ur_lat, ur_lon, term=5):
         """
         Convert bounds of a domains in lat/lon to grid indexes
@@ -379,7 +397,7 @@ class Extractor:
 
             # nb_days_to_extract = len(list(dates))  # !!! attention !!! consumes the iterator !
             for idx_date, date in enumerate(dates):
-                date += timedelta(hours=self.analysis_hour)
+                # date += timedelta(hours=self.analysis_hour)
                 logger.info(f"Begin to extract {date}\n\n")
 
                 # self.send_email_at_half_execution(nb_days_to_extract, idx_date, t0)
@@ -427,14 +445,8 @@ class HendrixConductor:
                 if key in variables_nc}
         self.getter = self.parse_getter(getter)
         self.cache_folder = self.generate_name_of_cache_folder()
-        self.variables_fa = self.get_fa_variables_names()
-        self.contains_surface_variables = self.check_for_surface_variables()
-
-    def check_for_surface_variables(self):
-        if any([self.transformations[variable_nc].get("surface_variable") for variable_nc in self.transformations]):
-            return True
-        else:
-            return False
+        self.variables_fa, self.variables_grib, self.variables_surface = self.get_variables_names()
+        self.contains_surface_variables = any(self.variables_surface)
 
     def parse_getter(self, getter):
         """
@@ -517,7 +529,7 @@ class HendrixConductor:
                 else:
                     raise
 
-    def get_resource_from_hendrix(self, term, model_name=None):
+    def get_resource_from_hendrix(self, term, model_name=None, tmp_file='tmp_file.tmp'):
         """function that accesses resources on hendrix. Based on Epygram "use_vortex" function."""
 
         model_name = self.model_name if model_name is None else model_name
@@ -529,7 +541,7 @@ class HendrixConductor:
             **model_description,
             date=self.analysis_time,
             term=term,
-            local=os.path.join(self.folder, 'tmp_file.fa')
+            local=os.path.join(self.folder, tmp_file)
         ) for model_description in model_descriptions]
 
         resource = self._get_resources_vortex(resource_descriptions)
@@ -558,12 +570,20 @@ class HendrixConductor:
         name_compute_function = self.transformations[variable_nc]['compute']
         return globals().get(name_compute_function)
 
-    def get_fa_variables_names(self):
-        """Get fa names required to download a specific variable"""
+    def get_variables_names(self):
+        """
+        Get fa names, grib names and surface variable indicator required to download a specific
+        variable
+
+        """
         variables_fa = []
+        variables_grib = []
+        variables_surface = []
         for value in self.transformations.values():
             variables_fa.extend(value["fa_fields_required"])
-        return list(set(variables_fa))
+            variables_grib.extend(value["grib_fields_required"])
+            variables_surface.extend(value["surface_variable"])
+        return (variables_fa, variables_grib, variables_surface)
 
     def get_netcdf_filename_in_cache(self, term):
         """Get path to netcdf filenames in cache folder. One netcdf corresponds to one fa file."""
@@ -621,17 +641,25 @@ class HendrixConductor:
     @staticmethod
     def pass_fa_metadata_to_netcdf(field):
         """Pass metadata from fa file to netcdf file"""
-        field.fid['netCDF'] = field.fid['FA']
+        try:
+            field.fid['netCDF'] = field.fid['FA']
+        except KeyError:
+            field.fid['netCDF'] = field.fid['GRIB2']['shortName']
         return field
 
     def extract_domain_pixels(self, field):
         """Extract pixels of an Epygram field corresponding to a user defined domain"""
-        field = field.extract_subarray(
-            self.domain['first_i'],
-            self.domain['last_i'],
-            self.domain['first_j'],
-            self.domain['last_j']
-        )
+        if self.model_name not in ['AROME', 'AROME_SURFACE']:
+            x1, y1 = np.round(field.geometry.ll2ij(self.domain['lon_llc'], self.domain['lat_llc'])) + 1
+            x2, y2 = np.round(field.geometry.ll2ij(self.domain['lon_urc'], self.domain['lat_urc'])) + 1
+            field = field.extract_subarray(int(x1), int(x2), int(y1), int(y2))
+        else:
+            field = field.extract_subarray(
+                self.domain['first_i'],
+                self.domain['last_i'],
+                self.domain['first_j'],
+                self.domain['last_j']
+            )
         return field
 
     def write_time_fa_in_txt_file(self, field):
@@ -696,7 +724,24 @@ class HendrixConductor:
         """
         pass
 
+    def get_grib_names_of_surface_variables(self):
+        """
+        get list of surface variable names for a surface file in grib format.
+        :return: variables
+        :rtype: list
+        """
+        surface_variables_grib = []
+        for variable_nc in self.transformations:
+            if self.transformations[variable_nc].get("surface_variable"):
+                surface_variables_grib.extend(self.transformations[variable_nc]["grib_fields_required"])
+        return surface_variables_grib
+
     def get_fa_names_of_surface_variables(self):
+        """
+        get list of variable names for a surface file in fa format.
+        :return: variables
+        :rtype: list
+        """
         surface_variables_fa = []
         for variable_nc in self.transformations:
             if self.transformations[variable_nc].get("surface_variable"):
@@ -705,7 +750,12 @@ class HendrixConductor:
 
     @timer_decorator("fa_to_netcdf", unit='minute', level="____")
     def fa_to_netcdf(self, term):
-        """Builds a single netcdf file corresponding to a single fa file."""
+        """
+        Builds a single netcdf file corresponding to a single fa or grib file.
+
+        :param term: forecast leadtime
+        :type term: int
+        """
         self.create_cache_folder_if_doesnt_exist()
         input_resource = self.get_resource_from_hendrix(term)
 
@@ -713,14 +763,24 @@ class HendrixConductor:
         output_resource = epygram.formats.resource(netcdf_filename, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
 
-        if self.contains_surface_variables:
-            surface_resource = self.get_resource_from_hendrix(term, model_name=self.model_name+"_SURFACE")
-            surface_variables_fa = self.get_fa_names_of_surface_variables()
+        if input_resource.format in ['GRIB']:
+            variables = self.variables_grib
         else:
-            surface_variables_fa = []
+            variables = self.variables_fa
 
-        for variable in self.variables_fa:
-            resource = surface_resource if variable in surface_variables_fa else input_resource
+        # print("surf vars present: ", self.contains_surface_variables)
+        if self.contains_surface_variables:
+            surface_resource = self.get_resource_from_hendrix(term, model_name=self.model_name+"_SURFACE",
+                                                              tmp_file='tmp_file_surf.tmp')
+            # print('got surface resource')
+            if surface_resource.format in ['GRIB']:
+                variables =[grib if surf else var for var, grib, surf in zip(variables, self.variables_grib,
+                                                                             self.variables_surface)]
+            else:
+                variables =[fa if surf else var for var, fa, surf in zip(variables, self.variables_fa,
+                                                                             self.variables_surface)]
+        for variable, surf in zip(variables, self.variables_surface):
+            resource = surface_resource if surf else input_resource
             field = self.read_epygram_field(resource, variable)
             field = self.pass_fa_metadata_to_netcdf(field)
             field = self.transform_spectral_field_if_required(field)
@@ -750,8 +810,10 @@ class HendrixConductor:
             filename = self.get_netcdf_filename_in_cache(term)
             nc_file = xr.open_dataset(filename)
             dict_from_xarray = nc_file.to_dict()
-            for variable in self.variables_fa:
-                dict_data[term][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
+            print(dict_from_xarray.keys())
+            for variable in dict_from_xarray["data_vars"].keys():
+                if variable not in ['longitude', 'latitude', 'time']:
+                    dict_data[term][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
             # print(dict_from_xarray["data_vars"]["longitude"])
         dict_data["longitude"] = dict_from_xarray["data_vars"]["longitude"]
         dict_data["latitude"] = dict_from_xarray["data_vars"]["latitude"]

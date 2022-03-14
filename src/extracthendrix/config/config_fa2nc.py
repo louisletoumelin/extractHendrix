@@ -4,8 +4,8 @@ import numpy as np
 transformations = {
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],#CLSTEMPERATURE
-                        grib_field_required=['CLSTEMPERATURE'],
-                        surface_variable=False,
+                        grib_fields_required=[dict(shortName='2t', productDefinitionTemplateNumber=1)],
+                        surface_variable=[False],
                         compute="compute_temperature_in_degree_c",
                         details_original_field="2 m Temperature"
                         ),
@@ -29,12 +29,16 @@ transformations = {
 
                'ts':
                    dict(fa_fields_required=['SURFTEMPERATURE'],
+                        grib_fields_required=[dict()],
                         compute=None,
+                        surface_variable=[False],
                         details_original_field="Surface temperature. Ts (the one used in radiation)"),
 
                'Wind':
                    dict(fa_fields_required=['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
+                        grib_fields_required=[dict(shortName='10u'), dict(shortName='10v')],
                         compute="compute_wind_speed",
+                        surface_variable=[False, False],
                         details_original_field="10 m wind speed"),
 
                'Wind_Gust':
@@ -275,14 +279,25 @@ alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
                          'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU']}
 
 domains = {
-        'alp': {'first_i': np.intp(900), 'last_i': np.intp(1075), 'first_j': np.intp(525), 'last_j': np.intp(750)},
-        'pyr': {'first_i': np.intp(480), 'last_i': np.intp(785), 'first_j': np.intp(350), 'last_j': np.intp(475)},
-        'test_alp': {'first_i': np.intp(1090), 'last_i': np.intp(1100), 'first_j': np.intp(740), 'last_j': np.intp(750)},
-        'jesus': {'first_i': np.intp(551), 'last_i': np.intp(593), 'first_j': np.intp(414), 'last_j': np.intp(435)},
+        # alp: llc: 5.0144002419324005, 43.88876964463646, urc: 8.12542615983552, 46.39544595151476
+        'alp': {'first_i': np.intp(900), 'last_i': np.intp(1075), 'first_j': np.intp(525), 'last_j': np.intp(750),
+                'lon_llc': 5.0144, 'lat_llc': 43.88877, 'lon_urc': 8.125426, 'lat_urc': 46.395446},
+        # pyr: llc: -1.6595335090840648, 41.82557818025553, urc: 3.1394070548497726, 43.340642523635275
+        'pyr': {'first_i': np.intp(480), 'last_i': np.intp(785), 'first_j': np.intp(350), 'last_j': np.intp(475),
+                'lon_llc': -1.65953, 'lat_llc': 41.825578, 'lon_urc': 3.139407, 'lat_urc':43.3406425},
+        # test_alp: 8.365168412694894, 46.26501210734682, 8.547734007165145, 46.37194763162646
+        'test_alp': {'first_i': np.intp(1090), 'last_i': np.intp(1100), 'first_j': np.intp(740), 'last_j': np.intp(750),
+                     'lon_llc': 8.36517, 'lat_llc': 46.26501, 'lon_urc': 8.5477, 'lat_urc': 46.3719},
+        # jesus: -0.5829462515841322, 42.60378283181427, 0.07414925846528728, 42.86264147065351
+        'jesus': {'first_i': np.intp(551), 'last_i': np.intp(593), 'first_j': np.intp(414), 'last_j': np.intp(435),
+                  'lon_llc': -0.582946, 'lat_llc': 42.60378, 'lon_urc': 0.074149, 'lat_urc': 42.8626},
         # switzerland: lower left corner = 45.56420273320563, 5.609121093614332,
         # upper right corner = 47.971669285287895, 10.684804314227717
-        'switzerland': {'first_i': np.intp(931), 'last_i': np.intp(1211), 'first_j': np.intp(671), 'last_j': np.intp(899)},
+        'switzerland': {'first_i': np.intp(931), 'last_i': np.intp(1211), 'first_j': np.intp(671),
+                        'last_j': np.intp(899), 'lon_llc': 5.609121, 'lat_llc': 45.5642, 'lon_urc': 10.6848,
+                        'lat_urc': 47.97167},
         #corsica: lower left corner = 41.261440607733036, 8.339223910913976
         # upper right corner = 43.141222812632364, 9.718007989240773
-        'corsica': {'first_i': np.intp(1124), 'last_i': np.intp(1197), 'first_j': np.intp(314), 'last_j': np.intp(482)}
+        'corsica': {'first_i': np.intp(1124), 'last_i': np.intp(1197), 'first_j': np.intp(314), 'last_j': np.intp(482),
+                    'lon_llc': 8.33922, 'lat_llc': 41.26144, 'lon_urc': 9.718, 'lat_urc': 43.14122}
 }
