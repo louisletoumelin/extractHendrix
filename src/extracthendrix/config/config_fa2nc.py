@@ -28,7 +28,7 @@ transformations = {
                'Tair':
                    dict(fa_fields_required=['CLSTEMPERATURE'],
                         grib_fields_required=[dict(shortName='2t', productDefinitionTemplateNumber=1)],
-                        surface_variable=[False],
+                        is_surface_variable=[False],
                         compute="compute_temperature_in_degree_c",
                         details_original_field="2 m Temperature"
                         ),
@@ -40,7 +40,7 @@ transformations = {
                     dict(fa_fields_required=['SURFTEMPERATURE'],
                          grib_fields_required=[dict()],
                          compute=None,
-                         surface_variable=[False],
+                         is_surface_variable=[False],
                          details_original_field="Surface temperature. Ts (the one used in radiation)"),
                'Tmin':
                     dict(fa_fields_required=['CLSMINI.TEMPERAT'],
@@ -81,7 +81,7 @@ transformations = {
                    dict(fa_fields_required=['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
                         grib_fields_required=[dict(shortName='10u'), dict(shortName='10v')],
                         compute="compute_wind_speed",
-                        surface_variable=[False, False],
+                        is_surface_variable=[False, False],
                         details_original_field="10 m wind speed"),
 
                'Wind_Gust':
@@ -334,31 +334,31 @@ transformations = {
 
                'SWE':
                     dict(fa_fields_required=['X001WSN_VEG1'],
-                         surface_variable=[True],
+                         is_surface_variable=[True],
                          compute=None,
                          details_original_field="contenu équivalent en eau de la neige [km m-2]"),
 
                'snow_density':
                     dict(fa_fields_required=['X001RSN_VEG1'],
-                         surface_variable=[True],
+                         is_surface_variable=[True],
                          compute=None,
                          details_original_field="densité de la neige [km m-3]"),
 
                'snow_albedo':
                     dict(fa_fields_required=['X001ASN_VEG1'],
-                         surface_variable=[True],
+                         is_surface_variable=[True],
                          compute=None,
                          details_original_field="albédo de la neige"),
 
                'vegetation_fraction':
                     dict(fa_fields_required=['X001VEG'],
-                         surface_variable=[True],
+                         is_surface_variable=[True],
                          compute=None,
                          details_original_field="fraction de végétation"),
 
                'vegetation_rugosity':
                     dict(fa_fields_required=['X001Z0VEG'],
-                         surface_variable=[True],
+                         is_surface_variable=[True],
                          compute=None,
                          details_original_field="rugosité de la végétaton"),
 

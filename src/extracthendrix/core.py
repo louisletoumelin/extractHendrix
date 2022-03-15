@@ -90,7 +90,7 @@ def get_name_from_email(email_address):
     return email_address.split("@")[0].replace('.', '_')
 
 
-def send_email(type_of_email, email_address, **kwargs):
+def _send_email(type_of_email, email_address, **kwargs):
     """Send email to email_address using Météo-France network"""
     server = smtplib.SMTP()
     server.connect('smtp.cnrm.meteo.fr')
@@ -199,6 +199,37 @@ class Extractor:
     def __repr__(self):
         return f"Extractor with following parameters {self.config_user}"
 
+    def send_email(self, type_of_email, t0=None, e=None, *args):
+
+        if type_of_email == "finished":
+            _send_email("finished", self.email_address,
+                        config_user=str(self.config_user),
+                        current_time=time.asctime(),
+                        time_to_download=str(np.round((time.time() - t0) / 3600, 2)),
+                        folder=self.folder)
+
+        elif type_of_email == "script_stopped":
+
+            _send_email("script_stopped", self.email_address,
+                        config_user=self.config_user,
+                        current_time=time.asctime(),
+                        error=e,
+                        folder=self.folder)
+
+        elif type_of_email == "extracted_first_half":
+            self._send_email_at_half_execution(*args)
+        else:
+            pass
+
+    def _send_email_at_half_execution(self, nb_days_to_extract, idx_date, t0):
+        if nb_days_to_extract > 100 and idx_date == (nb_days_to_extract // 2 + 1):
+            _send_email("extracted_first_half", self.email_address,
+                        config_user=str(self.config_user),
+                        current_time=time.asctime(),
+                        time_to_download=str(np.round((time.time() - t0) / 3600, 2)),
+                        errors=str(self.errors),
+                        folder=self.folder)
+
     @staticmethod
     def date_iterator(date_start, date_end):
         """Return a generator containing dates between date_start and date_end"""
@@ -248,7 +279,8 @@ class Extractor:
         ll_lat, ll_lon: lat and lon of lower left corner (ll)
         ur_lat, ur_lon: lat and lon of upper right corner (ur)
         """
-        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address, self.delta_terms)
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain,
+                              self.variables_nc, self.email_address, self.delta_terms)
         resource = hc.get_resource_from_hendrix(term)
         field = resource.readfield('CLSTEMPERATURE')
         ll_lat, ll_lon = field.geometry.ij2ll(first_i, first_j)
@@ -266,7 +298,8 @@ class Extractor:
         Return:
         first_i, last_i, first_j, last_j
         """
-        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain, self.variables_nc, self.email_address, self.delta_terms)
+        hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain,
+                              self.variables_nc, self.email_address, self.delta_terms)
         resource = hc.get_resource_from_hendrix(term)
         field = resource.readfield('CLSTEMPERATURE')
         x1, y1 = np.round(field.geometry.ll2ij(ll_lon, ll_lat)) + 1
@@ -346,7 +379,8 @@ class Extractor:
         with open(filename, "w+") as f:
             f.write(f"#MAIL={self.email_address}\n")
             for date in dates:
-                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc, self.email_address, self.delta_terms)
+                hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc,
+                                      self.email_address, self.delta_terms)
                 for term in range(self.start_term, self.end_term, self.delta_terms):
                     resources = hc.get_path_vortex_ressource(term)
                     for resource in resources:
@@ -364,15 +398,6 @@ class Extractor:
         print(info_prestaging)
 
         print_link_to_hendrix_documentation()
-
-    def send_email_at_half_execution(self, nb_days_to_extract, idx_date, t0):
-        if nb_days_to_extract > 100 and idx_date == (nb_days_to_extract // 2 + 1):
-            send_email("extracted_first_half", self.email_address,
-                       config_user=str(self.config_user),
-                       current_time=time.asctime(),
-                       time_to_download=str(np.round((time.time() - t0) / 3600, 2)),
-                       errors=str(self.errors),
-                       folder=self.folder)
 
     def _extract_initial_term(self):
         logger.info(f"Begin to extract initial term {self.start_term - 1} of first date {self.date_start}\n\n")
@@ -392,18 +417,15 @@ class Extractor:
             t0 = time.time()
             print_link_to_confluence_table_with_downloaded_data()
 
-            dates = self.date_iterator(self.date_start, self.date_end)
+            dates = list(self.date_iterator(self.date_start, self.date_end))
             names_netcdf = []
 
-            # name_initial_netcdf = self._extract_initial_term()  # interesting functionality for testing with a minimum of files
-            # names_netcdf.append(name_initial_netcdf)
-
-            # nb_days_to_extract = len(list(dates))  # !!! attention !!! consumes the iterator !
+            nb_days_to_extract = len(dates)
             for idx_date, date in enumerate(dates):
-                # date += timedelta(hours=self.analysis_hour)
+                date += timedelta(hours=self.analysis_hour)
                 logger.info(f"Begin to extract {date}\n\n")
 
-                # self.send_email_at_half_execution(nb_days_to_extract, idx_date, t0)
+                # self.send_email("extracted_first_half", nb_days_to_extract, idx_date, t0)
 
                 hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain,
                                       self.variables_nc, self.email_address, self.delta_terms)
@@ -414,21 +436,12 @@ class Extractor:
             if self.concat_mode == "timeseries":
                 self.concatenate_netcdf(names_netcdf)
 
-            send_email("finished", self.email_address,
-                       config_user=str(self.config_user),
-                       current_time=time.asctime(),
-                       time_to_download=str(np.round((time.time()-t0) / 3600, 2)),
-                       errors=str(self.errors),
-                       folder=self.folder)
-            logger.info("The extraction is finished\n\n")
+            self.send_email("finished")
+            logger.info("The extraction is finished\n\n", t0=t0)
 
         except Exception as e:
+            self.send_email("script_stopped", e=e)
             logger.critical("The extraction stopped\n\n")
-            send_email("script_stopped", self.email_address,
-                       config_user=self.config_user,
-                       current_time=time.asctime(),
-                       error=e,
-                       folder=self.folder)
             raise
 
 
@@ -448,8 +461,8 @@ class HendrixConductor:
                 if key in variables_nc}
         self.getter = self.parse_getter(getter)
         self.cache_folder = self.generate_name_of_cache_folder()
-        self.variables_fa, self.variables_grib, self.variables_surface = self.get_variables_names()
-        self.contains_surface_variables = any(self.variables_surface)
+        self.variables_fa, self.variables_grib, self.is_surface_variable = self.get_variables_names()
+        self.contains_surface_variables = any(self.is_surface_variable)
 
     def parse_getter(self, getter):
         """
@@ -478,14 +491,14 @@ class HendrixConductor:
         logger.error(f"Number of try: {nb_of_try + 1}/10\n\n")
         time.sleep(seconds_to_sleep)
 
-        send_email("problem_extraction", self.email_address,
-                   user=get_name_from_email(self.email_address),
-                   error_message=error,
-                   time_of_problem=time.asctime(),
-                   resource_that_stopped=str(resource_description),
-                   folder=self.folder,
-                   nb_of_try=str(nb_of_try + 1),
-                   time_waiting=time_str_mail)
+        _send_email("problem_extraction", self.email_address,
+                    user=get_name_from_email(self.email_address),
+                    error_message=error,
+                    time_of_problem=time.asctime(),
+                    resource_that_stopped=str(resource_description),
+                    folder=self.folder,
+                    nb_of_try=str(nb_of_try + 1),
+                    time_waiting=time_str_mail)
 
     def _get_resources_vortex(self, resource_descriptions_init):
         """Internal method that access files on Hendrix. Based on Epygram "use_vortex" function."""
@@ -581,12 +594,12 @@ class HendrixConductor:
         """
         variables_fa = []
         variables_grib = []
-        variables_surface = []
+        is_surface_variable = []
         for value in self.transformations.values():
             variables_fa.extend(value["fa_fields_required"])
             variables_grib.extend(value["grib_fields_required"])
-            variables_surface.extend(value["surface_variable"])
-        return (variables_fa, variables_grib, variables_surface)
+            is_surface_variable.extend(value["is_surface_variable"])
+        return (variables_fa, variables_grib, is_surface_variable)
 
     def get_netcdf_filename_in_cache(self, term):
         """Get path to netcdf filenames in cache folder. One netcdf corresponds to one fa file."""
@@ -735,7 +748,7 @@ class HendrixConductor:
         """
         surface_variables_grib = []
         for variable_nc in self.transformations:
-            if self.transformations[variable_nc].get("surface_variable"):
+            if self.transformations[variable_nc].get("is_surface_variable"):
                 surface_variables_grib.extend(self.transformations[variable_nc]["grib_fields_required"])
         return surface_variables_grib
 
@@ -747,12 +760,26 @@ class HendrixConductor:
         """
         surface_variables_fa = []
         for variable_nc in self.transformations:
-            if self.transformations[variable_nc].get("surface_variable"):
+            if self.transformations[variable_nc].get("is_surface_variable"):
                 surface_variables_fa.extend(self.transformations[variable_nc]["fa_fields_required"])
         return surface_variables_fa
 
-    @timer_decorator("fa_to_netcdf", unit='minute', level="____")
-    def fa_to_netcdf(self, term):
+    def _select_fa_or_grib_name(self, input_resource):
+        if input_resource.format in ['GRIB']:
+            return self.variables_grib
+        else:
+            return self.variables_fa
+
+    def _change_surface_variable_name_if_required(self, surface_resource, variables):
+        if surface_resource.format in ['GRIB']:
+            return [grib if is_surf else var for var, grib, is_surf in zip(variables, self.variables_grib,
+                                                                                self.is_surface_variable)]
+        else:
+            return [fa if is_surf else var for var, fa, is_surf in zip(variables, self.variables_fa,
+                                                                            self.is_surface_variable)]
+
+    @timer_decorator("hendrix_to_netcdf", unit='minute', level="____")
+    def hendrix_to_netcdf(self, term):
         """
         Builds a single netcdf file corresponding to a single fa or grib file.
 
@@ -766,24 +793,17 @@ class HendrixConductor:
         output_resource = epygram.formats.resource(netcdf_filename, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
 
-        if input_resource.format in ['GRIB']:
-            variables = self.variables_grib
-        else:
-            variables = self.variables_fa
+        variables = self._select_fa_or_grib_name(input_resource)
 
         # print("surf vars present: ", self.contains_surface_variables)
         if self.contains_surface_variables:
             surface_resource = self.get_resource_from_hendrix(term, model_name=self.model_name+"_SURFACE",
                                                               tmp_file='tmp_file_surf.tmp')
             # print('got surface resource')
-            if surface_resource.format in ['GRIB']:
-                variables =[grib if surf else var for var, grib, surf in zip(variables, self.variables_grib,
-                                                                             self.variables_surface)]
-            else:
-                variables =[fa if surf else var for var, fa, surf in zip(variables, self.variables_fa,
-                                                                             self.variables_surface)]
-        for variable, surf in zip(variables, self.variables_surface):
-            resource = surface_resource if surf else input_resource
+            variables = self._change_surface_variable_name_if_required(surface_resource, variables)
+
+        for variable, is_surface in zip(variables, self.is_surface_variable):
+            resource = surface_resource if is_surface else input_resource
             field = self.read_epygram_field(resource, variable)
             field = self.pass_fa_metadata_to_netcdf(field)
             field = self.transform_spectral_field_if_required(field)
@@ -859,7 +879,7 @@ class HendrixConductor:
         for term in range(start_term-1, end_term+1, self.delta_terms):
             #print(start_term, end_term, self.delta_terms, term)
             logger.debug(f"Begin to download term {term}\n\n")
-            self.fa_to_netcdf(term)
+            self.hendrix_to_netcdf(term)
         logger.debug(f"Terms converted to netcdf\n\n")
 
         dict_data = self.netcdf_in_cache_to_dict(start_term, end_term)
@@ -872,52 +892,3 @@ class HendrixConductor:
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
         self.delete_temporary_fa_file()
-
-
-
-"""
-if __name__ == '__main__':
-config_user = dict(
-
-#  Where you want to store the outputs
-folder= '/cnrm/cen/users/NO_SAVE/letoumelinl/folder/',
-
-# Models are defined in the models.ini file
-model_name = 'AROME',
-
-# The domain can be defined by its name or its coordinates
-# Existing domain can be found in the config_fa2nc.py file
-domain = "alp",
-lat_lon_lower_left = None,
-lat_lon_upper_right = None,
-
-# Variables to extract and to store in the netcdf file
-# Variable are defined in the config_fa2nc.py file
-variables_nc = ['Tair', 'Wind'],
-
-# "local" if the FA file are on your computer or "hendrix" otherwise
-getter = "hendrix",
-#get_resource_from_hendrix,
-
-# For prestaging and sending mail during (your mail = destination) extraction
-email_address = "louis.letoumelin@meteo.fr",
-
-# datetime(year, month, day, hour)
-date_start = datetime(2019, 5, 1, 0),
-date_end = datetime(2019, 5, 3, 0),
-
-# Analysis hour
-analysis_time = datetime(2019, 5, 1, 0),
-
-# Term in hour after analysis
-start_term = 6, # Default: 6 
-end_term = 6 + 24 ,# Defautl: 6+24 = 30
-    
-# How to group the netcdf files: "month", "year", "all"
-final_concatenation = "all"
-)
-
-e = Extractor(config_user)
-e.download()
-
-"""
