@@ -164,6 +164,9 @@ def print_link_to_arome_variables():
     link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
     print("Website with all AROME variables (might be outdated)")
     print(link)
+    link = "https://opensource.umr-cnrm.fr/projects/pnt-mine/wiki/Champs_de_surface_des_fichiers_de_sortie_en_PNT"
+    print("Website with all AROME surface variables (might be outdated)")
+    print(link)
 
 
 class Extractor:
@@ -810,7 +813,7 @@ class HendrixConductor:
             filename = self.get_netcdf_filename_in_cache(term)
             nc_file = xr.open_dataset(filename)
             dict_from_xarray = nc_file.to_dict()
-            print(dict_from_xarray.keys())
+            #print(dict_from_xarray.keys())
             for variable in dict_from_xarray["data_vars"].keys():
                 if variable not in ['longitude', 'latitude', 'time']:
                     dict_data[term][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
@@ -854,7 +857,7 @@ class HendrixConductor:
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
         """Downloads a netcdf file for a single day between start_term and end_term"""
         for term in range(start_term-1, end_term+1, self.delta_terms):
-            print(start_term, end_term, self.delta_terms, term)
+            #print(start_term, end_term, self.delta_terms, term)
             logger.debug(f"Begin to download term {term}\n\n")
             self.fa_to_netcdf(term)
         logger.debug(f"Terms converted to netcdf\n\n")
