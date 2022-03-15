@@ -363,6 +363,7 @@ transformations = {
                          details_original_field="rugosité de la végétaton"),
 
 }
+
 """
 Sometime, the name of a variable can change with time (ex: wind gust).
 Here are alternative names to check if first name is not found

@@ -597,7 +597,7 @@ class HendrixConductor:
         #        **get_model_description(self.model_name),
         #        date=self.analysis_time,
         #        term=term,
-        #        local='tmp_file.fa')
+        #        local='tmp_file.tmp')
 
         model_name = self.model_name if model_name is None else model_name
         model_descriptions = get_model_description(model_name)
@@ -608,7 +608,7 @@ class HendrixConductor:
             **model_description,
             date=self.analysis_time,
             term=term,
-            local=os.path.join(self.folder, 'tmp_file.fa')
+            local=os.path.join(self.folder, 'tmp_file.tmp')
         ) for model_description in model_descriptions]
 
         return [usevortex.get_resources(getmode='locate', **resource_description) for resource_description in resource_descriptions]
@@ -628,7 +628,7 @@ class HendrixConductor:
 
     def delete_temporary_fa_file(self):
         """Delete temporary fa file"""
-        os.remove(os.path.join(self.folder, 'tmp_file.fa'))
+        os.remove(os.path.join(self.folder, 'tmp_file.tmp'))
         logger.debug("Deleted temporary fa file\n\n")
 
     @staticmethod
