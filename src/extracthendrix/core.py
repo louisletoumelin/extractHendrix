@@ -185,21 +185,26 @@ class Extractor:
         self.start_term = config_user.get("start_term", 6)
         self.end_term = config_user.get("end_term", 30)
         self.delta_terms = config_user.get("delta_terms")
-
         self.concat_mode = config_user.get("concat_mode", "timeseries")
+        self.group_by_output_file = config_user.get("group_by_output_file")
+        self.errors = dict()
+        self.config_user = config_user
+        self.assert_correct_input()
 
+    def assert_correct_input(self):
+
+        # Getter
+        assert self.getter is in ["hendrix", "local"]
+
+        # Concat mode
         if self.concat_mode not in ["timeseries", "forecast"]:
             raise NotImplementedError("invalid concat_mode. Please choose timeseeries or forecast")
 
-        self.group_by_output_file = config_user.get("group_by_output_file")
-
+        # Concat mode and group_by_output_file compatibility
         if self.concat_mode == "timeseries" and self.group_by_output_file not in ["year", "month", "all"]:
             raise NotImplementedError("invalid group_by_output_file. year, month or all available for timeseries")
         elif self.concat_mode == "forecast" and self.group_by_output_file not in ["deterministic", "ensemble"]:
             raise NotImplementedError("invalid group_by_output_file. deterministic and ensemble available for forecasts")
-
-        self.errors = dict()
-        self.config_user = config_user
 
     def __repr__(self):
         return f"Extractor with following parameters {self.config_user}"
