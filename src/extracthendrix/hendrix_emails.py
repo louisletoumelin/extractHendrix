@@ -106,7 +106,7 @@ dict_with_all_emails = \
 
 
 def get_first_and_last_name_from_email(email_address):
-    return email_address.split("@")[0].replace('.', ' ')
+    return email_address.split("@")[0].replace('.', ' ').title()
 
 
 def _prepare_html(type_of_email, email_address, **kwargs):

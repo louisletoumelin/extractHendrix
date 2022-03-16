@@ -185,14 +185,19 @@ class Extractor:
         self.start_term = config_user.get("start_term", 6)
         self.end_term = config_user.get("end_term", 30)
         self.delta_terms = config_user.get("delta_terms")
+
         self.concat_mode = config_user.get("concat_mode", "timeseries")
+
         if self.concat_mode not in ["timeseries", "forecast"]:
             raise NotImplementedError("invalid concat_mode. Please choose timeseeries or forecast")
-        self.final_concatenation = config_user.get("final_concatenation")
-        if self.concat_mode == "timeseries" and self.final_concatenation not in ["year", "month", "all"]:
-            raise NotImplementedError("invalid finale_concatenation. year, month or all available for timeseries")
-        elif self.concat_mode == "forecast" and self.final_concatenation not in ["deterministic", "ensemble"]:
-            raise NotImplementedError("invalid final_concatenation. deterministic and ensemble available for forecasts")
+
+        self.group_by_output_file = config_user.get("group_by_output_file")
+
+        if self.concat_mode == "timeseries" and self.group_by_output_file not in ["year", "month", "all"]:
+            raise NotImplementedError("invalid group_by_output_file. year, month or all available for timeseries")
+        elif self.concat_mode == "forecast" and self.group_by_output_file not in ["deterministic", "ensemble"]:
+            raise NotImplementedError("invalid group_by_output_file. deterministic and ensemble available for forecasts")
+
         self.errors = dict()
         self.config_user = config_user
 
@@ -319,11 +324,11 @@ class Extractor:
                                                "varies with time (e.g. +/- 1 pixel)"
                 return
 
-            if self.final_concatenation == "month":
+            if self.group_by_output_file == "month":
                 self._concatenate_netcdf_by_year_and_month(dataset)
-            elif self.final_concatenation == "year":
+            elif self.group_by_output_file == "year":
                 self._concatenate_netcdf_by_year(dataset)
-            elif self.final_concatenation == "all":
+            elif self.group_by_output_file == "all":
                 self._concatenate_all_netcdf(dataset)
             else:
                 return
@@ -400,6 +405,7 @@ class Extractor:
         print_link_to_hendrix_documentation()
 
     def _extract_initial_term(self):
+        """Depreciated"""
         logger.info(f"Begin to extract initial term {self.start_term - 1} of first date {self.date_start}\n\n")
         hc = HendrixConductor(self.getter, self.folder, self.model_name, self.date_start, self.domain,
                               self.variables_nc, self.email_address, self.delta_terms)
@@ -436,8 +442,8 @@ class Extractor:
             if self.concat_mode == "timeseries":
                 self.concatenate_netcdf(names_netcdf)
 
-            self.send_email("finished")
-            logger.info("The extraction is finished\n\n", t0=t0)
+            self.send_email("finished", t0=t0)
+            logger.info("The extraction is finished\n\n")
 
         except Exception as e:
             self.send_email("script_stopped", e=e)
@@ -877,7 +883,6 @@ class HendrixConductor:
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
         """Downloads a netcdf file for a single day between start_term and end_term"""
         for term in range(start_term-1, end_term+1, self.delta_terms):
-            #print(start_term, end_term, self.delta_terms, term)
             logger.debug(f"Begin to download term {term}\n\n")
             self.hendrix_to_netcdf(term)
         logger.debug(f"Terms converted to netcdf\n\n")
