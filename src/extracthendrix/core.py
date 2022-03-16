@@ -185,7 +185,7 @@ class Extractor:
         self.start_term = config_user.get("start_term", 6)
         self.end_term = config_user.get("end_term", 30)
         self.delta_terms = config_user.get("delta_terms")
-        self.concat_mode = config_user.get("concat_mode", "timeseries")
+        self.mode = config_user.get("mode", "timeseries")
         self.group_by_output_file = config_user.get("group_by_output_file")
         self.errors = dict()
         self.config_user = config_user
@@ -194,16 +194,16 @@ class Extractor:
     def assert_correct_input(self):
 
         # Getter
-        assert self.getter is in ["hendrix", "local"]
+        assert self.getter in ["hendrix", "local"]
 
         # Concat mode
-        if self.concat_mode not in ["timeseries", "forecast"]:
-            raise NotImplementedError("invalid concat_mode. Please choose timeseeries or forecast")
+        if self.mode not in ["timeseries", "forecast"]:
+            raise NotImplementedError("invalid mode. Please choose timeseeries or forecast")
 
         # Concat mode and group_by_output_file compatibility
-        if self.concat_mode == "timeseries" and self.group_by_output_file not in ["year", "month", "all"]:
+        if self.mode == "timeseries" and self.group_by_output_file not in ["year", "month", "all"]:
             raise NotImplementedError("invalid group_by_output_file. year, month or all available for timeseries")
-        elif self.concat_mode == "forecast" and self.group_by_output_file not in ["deterministic", "ensemble"]:
+        elif self.mode == "forecast" and self.group_by_output_file not in ["deterministic", "ensemble"]:
             raise NotImplementedError("invalid group_by_output_file. deterministic and ensemble available for forecasts")
 
     def __repr__(self):
@@ -318,7 +318,7 @@ class Extractor:
 
     def concatenate_netcdf(self, list_daily_netcdf_files):
         """Concatenates files according to desired output shape"""
-        if self.concat_mode == "timeseries":
+        if self.mode == "timeseries":
             try:
                 dataset = xr.open_mfdataset([os.path.join(self.folder, file) for file in list_daily_netcdf_files],
                                             data_vars='different')
@@ -337,11 +337,11 @@ class Extractor:
                 self._concatenate_all_netcdf(dataset)
             else:
                 return
-        elif self.concat_mode == "forecast":
+        elif self.mode == "forecast":
             # todo: implement concatenation
             pass
         else:
-            raise NotImplementedError("concatenation mode ", self.concat_mode, "not implemented")
+            raise NotImplementedError("concatenation mode ", self.mode, "not implemented")
 
     def _concatenate_netcdf_by_year_and_month(self, dataset):
         """Internal method to concatenated a xarray dataset composed of daily files into individual
@@ -422,8 +422,8 @@ class Extractor:
     def download(self):
         """Download data"""
         logger.info(f"self terms: {self.start_term} {self.end_term}")
-        if self.concat_mode == "timeseries" and (self.end_term - self.start_term) != 23:
-            logger.warning("end_term - start_term should be equal to 23h when concat_mode is timeseries.")
+        if self.mode == "timeseries" and (self.end_term - self.start_term) != 23:
+            logger.warning("end_term - start_term should be equal to 23h when mode is timeseries.")
         try:
             t0 = time.time()
             print_link_to_confluence_table_with_downloaded_data()
@@ -444,7 +444,7 @@ class Extractor:
                 names_netcdf.append(hc.generate_name_output_netcdf(self.start_term, self.end_term))
             logger.info(f"Daily netcdf are downloaded\n\n")
 
-            if self.concat_mode == "timeseries":
+            if self.mode == "timeseries":
                 self.concatenate_netcdf(names_netcdf)
 
             self.send_email("finished", t0=t0)
