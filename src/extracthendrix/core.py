@@ -421,7 +421,7 @@ class Extractor:
 
     def download(self):
         """Download data"""
-        logger.info(f"self terms: {self.start_term} {self.end_term}")
+        #logger.info(f"self terms: {self.start_term} {self.end_term}")
         if self.mode == "timeseries" and (self.end_term - self.start_term) != 23:
             logger.warning("end_term - start_term should be equal to 23h when mode is timeseries.")
         try:
