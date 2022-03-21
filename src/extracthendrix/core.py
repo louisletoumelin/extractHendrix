@@ -238,8 +238,7 @@ class Extractor:
             pass
 
     def _send_email_at_half_execution(self, nb_days_to_extract, idx_date, t0):
-        #if nb_days_to_extract > 0 and idx_date == (nb_days_to_extract // 2 + 1):
-        if nb_days_to_extract > 0:
+        if nb_days_to_extract > 0 and idx_date == (nb_days_to_extract // 2 + 1):
             _send_email("extracted_first_half", self.email_address,
                         config_user=str(self.config_user),
                         current_time=time.asctime(),
@@ -467,7 +466,7 @@ class Extractor:
                 date += timedelta(hours=self.analysis_hour)
                 logger.info(f"Begin to extract {date}\n\n")
 
-                self.send_email("extracted_first_half", nb_days_to_extract, idx_date, t0)
+                #self.send_email("extracted_first_half", nb_days_to_extract, idx_date, t0)
 
                 hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain,
                                       self.variables_nc, self.email_address, self.delta_terms)
