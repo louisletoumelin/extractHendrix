@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from extracthendrix.core import HendrixConductor
-from extracthendrix.config.config_fa2nc import transformations, domains
+from extracthendrix.config.config_fa_or_grib2nc import transformations, domains
 import os
 import epygram
 

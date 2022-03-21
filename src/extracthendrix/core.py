@@ -15,6 +15,8 @@ import logging
 import itertools
 import copy
 import warnings
+from ftplib import FTP
+import getpass
 
 logger_epygram = logging.getLogger('epygram')
 logger_epygram.setLevel(level=logging.CRITICAL)
@@ -29,7 +31,8 @@ import xarray as xr
 
 import usevortex
 import epygram
-from extracthendrix.config.config_fa2nc import transformations, domains, alternatives_names_fa
+from extracthendrix.config.config_fa_or_grib2nc import transformations, alternatives_names_fa
+from extracthendrix.config.domains import domains
 from extracthendrix.config.post_processing_functions import *
 from extracthendrix.hendrix_emails import dict_with_all_emails, _prepare_html
 
@@ -38,7 +41,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def timer_decorator(argument, unit='minute', level="__"):
+def timer_decorator(argument, unit='minute', level=""):
     """
     Decorator to record execution time. Used as follow:
 
@@ -57,13 +60,14 @@ def timer_decorator(argument, unit='minute', level="__"):
                 time_execution = np.round((t1-t0) / 60, 2)
             elif unit == "second":
                 time_execution = np.round((t1 - t0), 2)
-            print(f"{level}Time to calculate {argument}: {time_execution} {unit}s")
+            logger.info(f"{level}Time to calculate {argument}: {time_execution} {unit}s\n\n")
             return result
         return wrapper
     return decorator
 
 
 def model_ini_to_dict(model_name):
+    """Converts config/models.ini into a dictionary"""
     config = configparser.ConfigParser()
     models_path = pkg_resources.resource_filename('extracthendrix.config', 'models.ini')
     config.read(models_path)
@@ -119,7 +123,7 @@ def _send_email(type_of_email, email_address, **kwargs):
 
 
 def callSystemOrDie(commande, errorcode=None):
-    """Not used yet"""
+    """Not used"""
     status = os.system(commande)
     if status != 0:
 
@@ -155,7 +159,7 @@ def print_link_to_hendrix_documentation():
 
 def print_link_to_confluence_table_with_downloaded_data():
     link = "http://confluence.meteo.fr/pages/viewpage.action?pageId=314552092"
-    print("\n[INFORMATION] Have you check that the data you request is not already downloaded at CEN?\n")
+    print("\nHave you check that the data you request is not already downloaded at CEN?\n")
     print("Please see the link below")
     print(link)
 
@@ -189,27 +193,29 @@ class Extractor:
         self.group_by_output_file = config_user.get("group_by_output_file")
         self.errors = dict()
         self.config_user = config_user
-        self.assert_correct_input()
+        self.assert_correct_inputs()
 
-    def assert_correct_input(self):
+    def assert_correct_inputs(self):
+        """assert that inputs correspond to correct values"""
 
         # Getter
-        assert self.getter in ["hendrix", "local"]
+        assert self.getter in [None, "hendrix", "local"]
 
         # Concat mode
-        if self.mode not in ["timeseries", "forecast"]:
+        if self.mode not in [None, "timeseries", "forecast"]:
             raise NotImplementedError("invalid mode. Please choose timeseeries or forecast")
 
         # Concat mode and group_by_output_file compatibility
         if self.mode == "timeseries" and self.group_by_output_file not in ["year", "month", "all"]:
             raise NotImplementedError("invalid group_by_output_file. year, month or all available for timeseries")
+
         elif self.mode == "forecast" and self.group_by_output_file not in ["deterministic", "ensemble"]:
             raise NotImplementedError("invalid group_by_output_file. deterministic and ensemble available for forecasts")
 
     def __repr__(self):
         return f"Extractor with following parameters {self.config_user}"
 
-    def send_email(self, type_of_email, t0=None, e=None, *args):
+    def send_email(self, type_of_email, t0=None, e=None, nb_days_to_extract=None, idx_date=None):
 
         if type_of_email == "finished":
             _send_email("finished", self.email_address,
@@ -227,12 +233,13 @@ class Extractor:
                         folder=self.folder)
 
         elif type_of_email == "extracted_first_half":
-            self._send_email_at_half_execution(*args)
+            self._send_email_at_half_execution(nb_days_to_extract=nb_days_to_extract, idx_date=idx_date, t0=t0)
         else:
             pass
 
     def _send_email_at_half_execution(self, nb_days_to_extract, idx_date, t0):
-        if nb_days_to_extract > 100 and idx_date == (nb_days_to_extract // 2 + 1):
+        #if nb_days_to_extract > 0 and idx_date == (nb_days_to_extract // 2 + 1):
+        if nb_days_to_extract > 0:
             _send_email("extracted_first_half", self.email_address,
                         config_user=str(self.config_user),
                         current_time=time.asctime(),
@@ -254,7 +261,7 @@ class Extractor:
         date_start = datetime(2019, 10, 1, 0)
         date_end = datetime(2020, 2, 29, 0)
         get_year_and_month_between_dates(date_start, date_end)
-        # returns [(2019, 10), (2019, 11), (2019, 12), (2020, 1), (2020, 2)]
+        returns [(2019, 10), (2019, 11), (2019, 12), (2020, 1), (2020, 2)]
         """
         total_months = lambda dt: dt.month + 12 * dt.year
         mlist = []
@@ -375,16 +382,26 @@ class Extractor:
         dataset.to_netcdf(filename)
         logger.info("Concatenation worked\n\n")
 
-    def prepare_prestaging_demand(self):
-        """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
-        dates = self.date_iterator(self.date_start, self.date_end)
-
+    def _create_file_txt_prestaging(self):
         begin_str = self.date_start.strftime("%m/%d/%Y").replace('/', '_')
         end_str = self.date_end.strftime("%m/%d/%Y").replace('/', '_')
         name_str = get_name_from_email(self.email_address)
-
         filename = f"request_prestaging_{name_str}_{self.model_name}_begin_{begin_str}_end_{end_str}.txt"
         filename = os.path.join(self.folder, filename)
+
+        return filename
+
+    def prepare_prestaging_demand(self):
+        """Creates a 'request_prestaging_*.txt' file containing all the necessary information for prestagging"""
+        filename = self._create_file_txt_prestaging()
+        dates = self.date_iterator(self.date_start, self.date_end)
+
+        # Necessary to check if file really exists
+        ftp = FTP('hendrix.meteo.fr')
+        print("Connect to Hendrix")
+        login = input("Login: ")
+        password = getpass.getpass("Password: ")
+        ftp.login(login, password)
 
         with open(filename, "w+") as f:
             f.write(f"#MAIL={self.email_address}\n")
@@ -393,15 +410,29 @@ class Extractor:
                                       self.email_address, self.delta_terms)
                 for term in range(self.start_term, self.end_term, self.delta_terms):
                     resources = hc.get_path_vortex_ressource(term)
+
+                    if hc.contains_surface_variables:
+                        surface_ressource = hc.get_path_vortex_ressource(term, model_name=self.model_name + "_SURFACE")
+                        resources.extend(surface_ressource)
+
                     for resource in resources:
-                        f.write(resource[0].split(':')[1] + "\n")
+                        path_file = resource[0].split(':')[1]
+                        file_name = path_file.split('/')[-1]
+                        path_folder = '/'.join(path_file.split('/')[:-1])
+
+                        # Check that the file exist at the specified path
+                        ftp.cwd(path_folder)
+                        for file in ftp.nlst():
+                            if file_name in file:
+                                path_fo_file = os.path.join(path_folder, file)
+                                f.write(path_fo_file + "\n")
 
         info_prestaging = "\n\nPlease find below the procedure for prestaging. \
         Note a new file named 'request_prestaging_*.txt' has been created on your current folder\n\n1. \
         Drop this file on Hendrix, in the folder DemandeMig/ChargeEnEspaceRapide \
         \nYou can use FileZilla with your computer, or ftp to drop the file.\n\n2. \
         Rename the extension of the file '.txt' (once it is on Hendrix) with '.MIG'\n\
-        'request_prestaging_*.txt'  => 'request_prestaging_.MIG'\n\n\
+        'request_prestaging_*.txt'  => 'request_prestaging_*.MIG'\n\n\
         Note: don't rename in '.MIG' before dropping the file on Hendrix, or Hendrix could launch prestaging\
         before the file is fully uploaded\n\n3. \
         Please wait for an email from the Hendrix team to download your data\n\n"
@@ -423,7 +454,7 @@ class Extractor:
         """Download data"""
         #logger.info(f"self terms: {self.start_term} {self.end_term}")
         if self.mode == "timeseries" and (self.end_term - self.start_term) != 23:
-            logger.warning("end_term - start_term should be equal to 23h when mode is timeseries.")
+            logger.warning("end_term - start_term should be equal to 23h when mode is timeseries.\n\n")
         try:
             t0 = time.time()
             print_link_to_confluence_table_with_downloaded_data()
@@ -436,7 +467,7 @@ class Extractor:
                 date += timedelta(hours=self.analysis_hour)
                 logger.info(f"Begin to extract {date}\n\n")
 
-                # self.send_email("extracted_first_half", nb_days_to_extract, idx_date, t0)
+                self.send_email("extracted_first_half", nb_days_to_extract, idx_date, t0)
 
                 hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain,
                                       self.variables_nc, self.email_address, self.delta_terms)
@@ -653,10 +684,14 @@ class HendrixConductor:
         shutil.rmtree(self.cache_folder, ignore_errors=True)
         logger.debug("Deleted temporary folder\n\n")
 
-    def delete_temporary_fa_file(self):
+    def delete_temporary_file(self):
         """Delete temporary fa file"""
         os.remove(os.path.join(self.folder, 'tmp_file.tmp'))
-        logger.debug("Deleted temporary fa file\n\n")
+
+        if self.contains_surface_variables:
+            os.remove(os.path.join(self.folder, 'tmp_file_surf.tmp'))
+
+        logger.debug("Deleted temporary fa or grib file\n\n")
 
     @staticmethod
     def transform_spectral_field_if_required(field):
@@ -666,7 +701,7 @@ class HendrixConductor:
         return field
 
     @staticmethod
-    def pass_fa_metadata_to_netcdf(field):
+    def pass_metadata_to_netcdf(field):
         """Pass metadata from fa file to netcdf file"""
         try:
             field.fid['netCDF'] = field.fid['FA']
@@ -689,13 +724,16 @@ class HendrixConductor:
             )
         return field
 
-    def write_time_fa_in_txt_file(self, field):
-        """Read time in fa file and store it in txt file. This method prevents to mix dates of the extracted files"""
+    def write_time_in_txt_file(self, field):
+        """
+        Read time in fa or grib file and store it in txt file.
+        This method prevents to mix dates of the extracted files
+        """
         with open(os.path.join(self.cache_folder, "times.txt"), "a+") as t:
-            time_in_fa_file = field.validity[0].get()
-            t.write(time_in_fa_file.strftime("%Y/%m/%d_%H:%M:%S")+"\n")
+            time_in_fa_or_grib_file = field.validity[0].get()
+            t.write(time_in_fa_or_grib_file.strftime("%Y/%m/%d_%H:%M:%S")+"\n")
 
-    def read_times_fa_in_txt_file(self):
+    def read_times_in_txt_file(self):
         """Read the dates corresponding to simulation time, stored in a txt file."""
         with open(os.path.join(self.cache_folder, "times.txt"), "r") as t:
             list_times = []
@@ -715,7 +753,7 @@ class HendrixConductor:
             return field
 
         except AssertionError:
-
+            # todo adapt this part to grib
             if variable in alternatives_names_fa:
                 alternatives_names = alternatives_names_fa[variable]
 
@@ -816,15 +854,15 @@ class HendrixConductor:
         for variable, is_surface in zip(variables, self.is_surface_variable):
             resource = surface_resource if is_surface else input_resource
             field = self.read_epygram_field(resource, variable)
-            field = self.pass_fa_metadata_to_netcdf(field)
-            field = self.transform_spectral_field_if_required(field)
-            field = self.extract_domain_pixels(field)
+            field = self.pass_metadata_to_netcdf(field)
+            field = self.transform_spectral_field_if_required(field) # Isabelle also did transform_spectral
+            field = self.extract_domain_pixels(field)                # then extract domain (same order)
             output_resource.writefield(field)
 
         #todo implement this function
         self.add_metadate_necessary_to_surfex(netcdf_filename)
 
-        self.write_time_fa_in_txt_file(field)
+        self.write_time_in_txt_file(field)
         logger.debug(f"Successfully converted a fa file to netcdf for term {term}\n\n")
 
     def netcdf_in_cache_to_dict(self, start_term, end_term):
@@ -841,18 +879,20 @@ class HendrixConductor:
         """
         dict_data = defaultdict(lambda: defaultdict(dict))
         for term in range(start_term-1, end_term+1, self.delta_terms):
+
             filename = self.get_netcdf_filename_in_cache(term)
             nc_file = xr.open_dataset(filename)
+
             dict_from_xarray = nc_file.to_dict()
-            #print(dict_from_xarray.keys())
             for variable in dict_from_xarray["data_vars"].keys():
                 if variable not in ['longitude', 'latitude', 'time']:
                     dict_data[term][variable] = np.array(dict_from_xarray["data_vars"][variable]["data"])
-            # print(dict_from_xarray["data_vars"]["longitude"])
+
         dict_data["longitude"] = dict_from_xarray["data_vars"]["longitude"]
         dict_data["latitude"] = dict_from_xarray["data_vars"]["latitude"]
         dict_data["Projection_parameters"] = dict_from_xarray["data_vars"]["Projection_parameters"]
         logging.debug("Successfully converted netcdf (for each term) into a nested dictionary containing numpy arrays")
+
         return dict_data
 
     def post_process(self, input_dict, output_dict, term, **kwargs):
@@ -860,6 +900,7 @@ class HendrixConductor:
         for variable_nc in self.transformations:
 
             compute = self.get_compute_function(variable_nc)
+            #todo adapt this part to grib
             name_variables_fa = self.transformations[variable_nc]['fa_fields_required']
             output_dict[variable_nc]["dims"] = ('time', 'yy', 'xx')
             if compute is not None:
@@ -879,7 +920,7 @@ class HendrixConductor:
         dataset = xr.Dataset.from_dict(post_processed_data)
 
         # Create a time variable
-        time = self.read_times_fa_in_txt_file()
+        time = self.read_times_in_txt_file()
         dataset["time"] = (('time'), time[1:])
         dataset.to_netcdf(os.path.join(self.folder, filename_nc))
         logging.debug("Successfully converted nested dict to netcdf")
@@ -887,6 +928,8 @@ class HendrixConductor:
     @timer_decorator("download daily netcdf", unit='minute', level="__")
     def download_daily_netcdf(self, start_term, end_term, **kwargs):
         """Downloads a netcdf file for a single day between start_term and end_term"""
+
+        # start_term - 1 because we need the previous term for decumul
         for term in range(start_term-1, end_term+1, self.delta_terms):
             logger.debug(f"Begin to download term {term}\n\n")
             self.hendrix_to_netcdf(term)
@@ -901,4 +944,4 @@ class HendrixConductor:
 
         self.dict_to_netcdf(post_processed_data, start_term, end_term)
         self.delete_cache_folder()
-        self.delete_temporary_fa_file()
+        self.delete_temporary_file()

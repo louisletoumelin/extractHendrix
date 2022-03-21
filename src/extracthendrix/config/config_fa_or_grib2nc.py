@@ -35,22 +35,25 @@ transformations = {
                'T1':
                    dict(fa_fields_required=['S090TEMPERATURE'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute="compute_temperature_in_degree_c",
                         details_original_field="Prognostic lowest level temperature"),
                 'ts':
                     dict(fa_fields_required=['SURFTEMPERATURE'],
                          grib_fields_required=[dict()],
-                         compute=None,
                          is_surface_variable=[False],
+                         compute=None,
                          details_original_field="Surface temperature. Ts (the one used in radiation)"),
                'Tmin':
                     dict(fa_fields_required=['CLSMINI.TEMPERAT'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_temperature_in_degree_c",
                          details_original_field="T2m mini since last output file"),
                'Tmax':
                     dict(fa_fields_required=['CLSMAXI.TEMPERAT'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_temperature_in_degree_c",
                          details_original_field="T2m maxi since last output file"),
 
@@ -64,18 +67,21 @@ transformations = {
                'Qair':
                    dict(fa_fields_required=['CLSHUMI.SPECIFIQ'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute=None,
                         details_original_field="2m specific humidity"),
 
                'Q1':
                    dict(fa_fields_required=['S090HUMI.SPECIFI'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute=None,
                         details_original_field="Specific moisture"),
 
                'RH2m':
                     dict(fa_fields_required=['CLSHUMI.RELATIVE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_multiply_by_100",
                          details_original_field=" 	2m relative humidity"),
 
@@ -86,20 +92,22 @@ transformations = {
                'Wind':
                    dict(fa_fields_required=['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
                         grib_fields_required=[dict(shortName='10u'), dict(shortName='10v')],
-                        compute="compute_wind_speed",
                         is_surface_variable=[False, False],
+                        compute="compute_wind_speed",
                         details_original_field="10 m wind speed"),
 
                'Wind_Gust':
                    # Wind gust name has changed few years ago
                    dict(fa_fields_required=['CLSU.RAF60M.XFU', 'CLSV.RAF60M.XFU'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_wind_speed",
                         details_original_field="U and V 10m wind gusts (max since last file)"),
 
                'Wind_DIR':
                    dict(fa_fields_required =['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_wind_direction"),
 
                #
@@ -109,12 +117,14 @@ transformations = {
                'PSurf':
                    dict(fa_fields_required=['SURFPRESSION'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute="compute_psurf",
                         details_original_field="Surface pressure"),
 
                'ZS':
                    dict(fa_fields_required=['SPECSURFGEOPOTEN'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute="compute_zs",
                         details_original_field="Surface elevation. "
                                 "This variable is added once to the netcdf: during the first forecast term"),
@@ -122,6 +132,7 @@ transformations = {
                'BLH':
                     dict(fa_fields_required=['CLPMHAUT.MOD.XFU'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Boudary Layer Height (m)"),
 
@@ -132,16 +143,19 @@ transformations = {
                'Rainf':
                    dict(fa_fields_required=['SURFACCPLUIE'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute="compute_decumul"),
 
                'Grauf':
                    dict(fa_fields_required=['SURFACCGRAUPEL'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute="compute_decumul"),
 
                'Snowf':
                     dict(fa_fields_required=['SURFACCNEIGE', 'SURFACCGRAUPEL'],
                          grib_fields_required=[dict(), dict()],
+                         is_surface_variable=[False, False],
                          compute="compute_snowfall",
                          details_original_field="Snowfall = Cumulative snow + graupel"),
 
@@ -152,26 +166,31 @@ transformations = {
                'LWdown':
                     dict(fa_fields_required=['SURFRAYT THER DE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul"),
                'LWU':
                    dict(fa_fields_required=['SURFRAYT THER DE', 'SURFFLU.RAY.THER'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_decumul_and_diff"),
 
                'TOA_LWnet':
                     dict(fa_fields_required=['SOMMFLU.RAY.THER'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. net IR flux top of atm."),
                'LWnet':
                     dict(fa_fields_required=['SURFFLU.RAY.THER'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. net IR flux at surface"),
 
                'clear_sky_LWnet':
                     dict(fa_fields_required=['SnnnRAYT THER CL'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Net Clear sky surf thermal radiation"),
 
@@ -182,38 +201,45 @@ transformations = {
                'DIR_SWdown':
                     dict(fa_fields_required=['SURFRAYT DIR SUR'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul"),
                'SCA_SWdown':
                    dict(fa_fields_required=['SURFRAYT SOLA DE', 'SURFRAYT DIR SUR'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_decumul_and_diff",
                         details_original_field="SURFRAYT SOLA DE = Cum. Downward solar flux at surface"),
 
                'TOA_SWnet':
                     dict(fa_fields_required=['SOMMFLU.RAY.SOLA'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. net solar flux top of atm."),
                'SWnet':
                     dict(fa_fields_required=['SURFFLU.RAY.SOLA'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. net solar flux at surface"),
                'SWD':
                    dict(fa_fields_required=['SURFRAYT SOLA DE'],
                         grib_fields_required=[dict()],
+                        is_surface_variable=[False],
                         compute="compute_decumul",
                          details_original_field="Cum. Downward solarflux at surface"),
 
                'SWU':
                    dict(fa_fields_required=['SURFRAYT SOLA DE', 'SURFFLU.RAY.SOLA'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_decumul_and_diff",
                          details_original_field="Cum. Downward solarflux at surface"),
 
                'clear_sky_SWnet':
                     dict(fa_fields_required=['SnnnRAYT SOL CL'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Net Clear sky surf solar radiation"),
 
@@ -225,11 +251,13 @@ transformations = {
                'LHF':
                     dict(fa_fields_required=['SURFFLU.LAT.MEVA', 'SURFFLU.LAT.MSUB'],
                          grib_fields_required=[dict(), dict()],
+                         is_surface_variable=[False, False],
                          compute="compute_latent_heat_flux",
                          details_original_field="LHF =SURFFLU.LAT.MEVA' + 'SURFFLU.LAT.MSUB'"),
                'SHF':
                     dict(fa_fields_required=['SURFFLU.CHA.SENS'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul_and_negative",
                          details_original_field="Cum.Sensible heat flux"),
 
@@ -241,42 +269,50 @@ transformations = {
                'CC_inst':
                     dict(fa_fields_required=['SURFNEBUL.TOTALE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Inst. Total nebulosity"),
                'CC_inst_low':
                     dict(fa_fields_required=['SURFNEBUL.BASSE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Inst. Low nebulosity"),
                'CC_inst_middle':
                     dict(fa_fields_required=['SURFNEBUL.MOYENN'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Inst. Middle nebulosity"),
                'CC_inst_high':
                     dict(fa_fields_required=['SURFNEBUL.HAUTE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="Inst. High nebulosity"),
 
                'CC_cumul':
                     dict(fa_fields_required=['ATMONEBUL.TOTALE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. total nebulosity"),
                'CC_cumul_low':
                     dict(fa_fields_required=['ATMONEBUL.BASSE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. total nebulosity. Used by Seity."),
                'CC_cumul_middle':
                     dict(fa_fields_required=['ATMONEBUL.MOYENN'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. total nebulosity. Used by Seity."),
                'CC_cumul_high':
                     dict(fa_fields_required=['ATMONEBUL.HAUTE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute="compute_decumul",
                          details_original_field="Cum. total nebulosity. Used by Seity."),
                #
@@ -286,78 +322,91 @@ transformations = {
                'Wind90':
                    dict(fa_fields_required=['S090WIND.U.PHYS', 'S090WIND.V.PHYS'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_wind_speed",
                         details_original_field="5 m wind speed"),
 
                'Wind87':
                    dict(fa_fields_required=['S087WIND.U.PHYS', 'S087WIND.V.PHYS'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_wind_speed",
                         details_original_field="50 m wind speed"),
 
                'Wind84':
                    dict(fa_fields_required=['S084WIND.U.PHYS', 'S084WIND.V.PHYS'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_wind_speed",
                         details_original_field="126 m wind speed"),
 
                'Wind75':
                    dict(fa_fields_required=['S075WIND.U.PHYS', 'S075WIND.V.PHYS'],
                         grib_fields_required=[dict(), dict()],
+                        is_surface_variable=[False, False],
                         compute="compute_wind_speed",
                         details_original_field="515 m wind speed"),
 
                'TKE90':
                     dict(fa_fields_required=['S090TKE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="5 m TKE"),
 
                'TKE87':
                     dict(fa_fields_required=['S087TKE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="50 m TKE"),
 
                'TKE84':
                     dict(fa_fields_required=['S084TKE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="126 m TKE"),
 
                'TKE75':
                     dict(fa_fields_required=['S075TKE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="515 m TKE"),
 
                'TT90':
                     dict(fa_fields_required=['S090TEMPERATURE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="5 m Temperature"),
 
                'TT87':
                     dict(fa_fields_required=['S087TEMPERATURE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="50 m Temperature"),
 
                'TT84':
                     dict(fa_fields_required=['S084TEMPERATURE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="126 m Temperature"),
 
                'TT75':
                     dict(fa_fields_required=['S075TEMPERATURE'],
                          grib_fields_required=[dict()],
+                         is_surface_variable=[False],
                          compute=None,
                          details_original_field="515 m Temperature"),
 
                'water_content90':
                     dict(fa_fields_required=['S090CLOUD_WATER', 'S090ICE_CRYSTAL', 'S090SNOW', 'S090RAIN'],
                          grib_fields_required=[dict(), dict(), dict(), dict()],
+                         is_surface_variable=[False, False, False, False],
                          compute="compute_sum_all_water_species",
                          details_original_field="5 m water content"
                                                 "water content = Cloud dropplets + Ice crystals + Snow + Rain"),
@@ -365,18 +414,21 @@ transformations = {
                'water_content87':
                     dict(fa_fields_required=['S087CLOUD_WATER', 'S087ICE_CRYSTAL', 'S087SNOW', 'S087RAIN'],
                          grib_fields_required=[dict(), dict(), dict(), dict()],
+                         is_surface_variable=[False, False, False, False],
                          compute="compute_sum_all_water_species",
                          details_original_field="50 m water content"),
 
                'water_content84':
                     dict(fa_fields_required=['S084CLOUD_WATER', 'S084ICE_CRYSTAL', 'S084SNOW', 'S084RAIN'],
                          grib_fields_required=[dict(), dict(), dict(), dict()],
+                         is_surface_variable=[False, False, False, False],
                          compute="compute_sum_all_water_species",
                          details_original_field="126 m water content"),
 
                'water_content75':
                     dict(fa_fields_required=['S075CLOUD_WATER', 'S075ICE_CRYSTAL', 'S075SNOW', 'S075RAIN'],
                          grib_fields_required=[dict(), dict(), dict(), dict()],
+                         is_surface_variable=[False, False, False, False],
                          compute="compute_sum_all_water_species",
                          details_original_field="515 m water content"),
 
@@ -428,30 +480,3 @@ Here are alternative names to check if first name is not found
 
 alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
                          'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU']}
-
-"""
-A domain can be defined by coordinates (lat/lon) or indices on the grid of the model
-If indices are given, they will be prioritized.
-"""
-
-domains = {
-        # alp
-        'alp': {'first_i': np.intp(900), 'last_i': np.intp(1075), 'first_j': np.intp(525), 'last_j': np.intp(750),
-                'lon_llc': 5.0144, 'lat_llc': 43.88877, 'lon_urc': 8.125426, 'lat_urc': 46.395446},
-        # pyr
-        'pyr': {'first_i': np.intp(480), 'last_i': np.intp(785), 'first_j': np.intp(350), 'last_j': np.intp(475),
-                'lon_llc': -1.65953, 'lat_llc': 41.825578, 'lon_urc': 3.139407, 'lat_urc':43.3406425},
-        # test_alp
-        'test_alp': {'first_i': np.intp(1090), 'last_i': np.intp(1100), 'first_j': np.intp(740), 'last_j': np.intp(750),
-                     'lon_llc': 8.36517, 'lat_llc': 46.26501, 'lon_urc': 8.5477, 'lat_urc': 46.3719},
-        # jesus
-        'jesus': {'first_i': np.intp(551), 'last_i': np.intp(593), 'first_j': np.intp(414), 'last_j': np.intp(435),
-                  'lon_llc': -0.582946, 'lat_llc': 42.60378, 'lon_urc': 0.074149, 'lat_urc': 42.8626},
-        # switzerland
-        'switzerland': {'first_i': np.intp(931), 'last_i': np.intp(1211), 'first_j': np.intp(671),
-                        'last_j': np.intp(899), 'lon_llc': 5.609121, 'lat_llc': 45.5642, 'lon_urc': 10.6848,
-                        'lat_urc': 47.97167},
-        # corsica
-        'corsica': {'first_i': np.intp(1124), 'last_i': np.intp(1197), 'first_j': np.intp(314), 'last_j': np.intp(482),
-                    'lon_llc': 8.33922, 'lat_llc': 41.26144, 'lon_urc': 9.718, 'lat_urc': 43.14122}
-}
