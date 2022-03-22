@@ -55,7 +55,7 @@ def timer_decorator(argument, unit='minute', level=""):
             result = function(*args, **kwargs)
             t1 = time.time()
             if unit == "hour":
-                time_execution = np.round((t1 - t0) / (3600), 2)
+                time_execution = np.round((t1 - t0) / 3600, 2)
             elif unit == "minute":
                 time_execution = np.round((t1-t0) / 60, 2)
             elif unit == "second":
@@ -826,7 +826,7 @@ class HendrixConductor:
             return [fa if is_surf else var for var, fa, is_surf in zip(variables, self.variables_fa,
                                                                             self.is_surface_variable)]
 
-    @timer_decorator("hendrix_to_netcdf", unit='minute', level="____")
+    @timer_decorator("hendrix_to_netcdf", unit='minute', level="")
     def hendrix_to_netcdf(self, term):
         """
         Builds a single netcdf file corresponding to a single fa or grib file.

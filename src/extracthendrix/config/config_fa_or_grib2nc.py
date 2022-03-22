@@ -479,4 +479,5 @@ Here are alternative names to check if first name is not found
 """
 
 alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
-                         'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU']}
+                         'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU'],
+                         'X001ASN_VEG1': ['X001ASN_VEG']}
