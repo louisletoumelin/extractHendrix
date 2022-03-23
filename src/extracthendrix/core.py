@@ -408,7 +408,7 @@ class Extractor:
             for date in dates:
                 hc = HendrixConductor(self.getter, self.folder, self.model_name, date, self.domain, self.variables_nc,
                                       self.email_address, self.delta_terms)
-                for term in range(self.start_term, self.end_term, self.delta_terms):
+                for term in range(self.start_term-1, self.end_term+1, self.delta_terms):
                     resources = hc.get_path_vortex_ressource(term)
 
                     if hc.contains_surface_variables:
@@ -424,8 +424,9 @@ class Extractor:
                         try:
                             ftp.cwd(path_folder)
                         except ftplib.error_perm:
-                            logger.warning(f"problem for locating {path_folder}")
-                            
+                            #logger.warning(f"problem for locating {path_folder}")
+                            continue
+
                         for file in ftp.nlst():
                             if file_name in file:
                                 path_fo_file = os.path.join(path_folder, file)
