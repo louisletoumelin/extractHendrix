@@ -17,6 +17,7 @@ import copy
 import warnings
 from ftplib import FTP
 import getpass
+import ftplib
 
 logger_epygram = logging.getLogger('epygram')
 logger_epygram.setLevel(level=logging.CRITICAL)
@@ -420,7 +421,11 @@ class Extractor:
                         path_folder = '/'.join(path_file.split('/')[:-1])
 
                         # Check that the file exist at the specified path
-                        ftp.cwd(path_folder)
+                        try:
+                            ftp.cwd(path_folder)
+                        except ftplib.error_perm:
+                            logger.warning(f"problem for locating {path_folder}")
+                            
                         for file in ftp.nlst():
                             if file_name in file:
                                 path_fo_file = os.path.join(path_folder, file)
@@ -747,18 +752,29 @@ class HendrixConductor:
         initial_name = variable
 
         try:
-
+            print("\ndebug")
+            print("first try")
+            print(variable)
             field = input_resource.readfield(variable)
             return field
 
         except AssertionError:
             # todo adapt this part to grib
+            print("\ndebug")
+            print("Assertion error for variable")
+            print(variable)
+
             if variable in alternatives_names_fa:
-                alternatives_names = alternatives_names_fa[variable]
+                alternatives_names = copy.deepcopy(alternatives_names_fa[variable])
+                print("\n\ndebug alternatives_names")
+                print(alternatives_names)
 
                 while alternatives_names:
                     try:
                         variable = alternatives_names.pop(0)
+                        print("\ndebug")
+                        print("try with variable")
+                        print(variable)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
                         logger.warning(f"Found an alternative name for {initial_name} that works: {variable}\n\n")
@@ -767,6 +783,9 @@ class HendrixConductor:
                         logger.error(f"Alternative name {variable} didn't work for variable {initial_name}\n\n")
                         pass
                 logger.error(f"We coulnd't find correct alternative names for {initial_name}\n\n")
+                print("\ndebug")
+                print("listfields")
+                print(input_resource.listfields())
                 raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
             else:
                 logger.error(f"We couldn't read {initial_name}\n\n")
@@ -851,6 +870,8 @@ class HendrixConductor:
             variables = self._change_surface_variable_name_if_required(surface_resource, variables)
 
         for variable, is_surface in zip(variables, self.is_surface_variable):
+            print("debug")
+            print(variable, is_surface)
             resource = surface_resource if is_surface else input_resource
             field = self.read_epygram_field(resource, variable)
             field = self.pass_metadata_to_netcdf(field)
