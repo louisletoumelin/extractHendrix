@@ -1,34 +1,16 @@
-from datetime import timedelta, time, datetime, date
+from extracthendrix.s2m_extractor import *
 from pprint import pprint
 
-from extracthendrix.s2m_extractor import S2MExtractor
+help = S2MArgHelper(
+    model='S2M_PRO',
+    member=36,
+    runtime=time(hour=3),
+    geometry='cor'
+)
+params = help.get_params_for_run_with_date(datetime(2022, 3, 12), -30)
+pprint(params)
+# noter que nulle part on n'indique previ=True/False c'est l'échéance qui va déterminer quel est sa valeur
+extractor = S2MExtractor(folder='tmp', s2mArgHelper=help)
 
-extractor = S2MExtractor(
-        folder="demo",
-        kind="pro",
-        previ=True,
-        runtime=time(hour=3),
-        geometry="cor",
-        member=36)
-
-
-
-
-
-
-pprint(extractor.get_available_runs())
-
-extractor.get_netcdf(date(2021,5,5))
-
-
-geometry="cor"
-argsextract = dict(folder='/home/merzisenh/NO_SAVE/cachesytron', geometry=geometry, member=36)
-
-datevalidite = date(2022,1,27)
-
-
-forcing_ana = S2MExtractor(kind='meteo',runtime=time(hour=6), previ=False, **argsextract).get_netcdf(datevalidite)
-
-
-
-
+extractor.get_netcdf(datetime(2022, 3, 26), 10)
+extractor.get_netcdf(datetime(2022, 3, 27), 10)
