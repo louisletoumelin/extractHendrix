@@ -1,13 +1,29 @@
 from datetime import timedelta, time, datetime, date
 import itertools
-from pprint import pprint
 import os
+import shutil
 
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
+import xarray as xr
 
 from extracthendrix.core import get_model_description
 
+# large extrait des variables S2M profils à donner en argument aux différentes fonctions
+# de lecture ci-dessous
+variables_S2M_PRO = [
+        'ZS', 'aspect', 'slope', 'massif_num', 'longitude', 'latitude',
+        'time', 'TG1', 'TG4', 'WG1', 'WGI1', 'WSN_VEG', 'RSN_VEG', 'ASN_VEG',
+        'NAT_LEV', 'AVA_TYP', 'TALB_ISBA', 'RN_ISBA', 'H_ISBA', 'LE_ISBA',
+        'GFLUX_ISBA', 'EVAP_ISBA', 'SWD_ISBA', 'SWU_ISBA', 'LWD_ISBA', 'LWU_ISBA',
+        'DRAIN_ISBA', 'RUNOFF_ISBA', 'SNOMLT_ISBA', 'RAINF_ISBA', 'TS_ISBA',
+        'WSN_T_ISBA', 'DSN_T_ISBA', 'SD_1DY_ISBA', 'SD_3DY_ISBA', 'SD_5DY_ISBA', 
+        'SD_7DY_ISBA', 'SWE_1DY_ISBA', 'SWE_3DY_ISBA', 'SWE_5DY_ISBA', 'SWE_7DY_ISBA',
+        'RAMSOND_ISBA', 'WET_TH_ISBA', 'REFRZTH_ISBA', 'DEP_HIG', 'DEP_MOD',
+        'ACC_LEV', 'SYTFLX_ISBA', 'SNOWLIQ', 'SNOWTEMP', 'SNOWDZ', 'SNOWDEND',
+        'SNOWSPHER', 'SNOWSIZE', 'SNOWSSA', 'SNOWTYPE', 'SNOWRAM', 'SNOWSHEAR',
+        'ACC_RAT', 'NAT_RAT', 'massif', 'naturalIndex'
+        ]
 
 class RunDoesntExistException(Exception):
     pass
@@ -149,11 +165,10 @@ class S2MArgHelper:
 
 
 class S2MExtractor:
-    def __init__(self, folder='tmp', s2mArgHelper=S2MArgHelper()):
+    def __init__(self, native_files_folder=None, cache_folder=None, s2mArgHelper=S2MArgHelper()):
         self.helper = s2mArgHelper
-        if not os.path.isdir(folder):
-            os.mkdir(folder)
-        self.folder = folder
+        self.native_files_folder = native_files_folder
+        self.cache_folder = cache_folder
 
     def get_file_hash(self, date, term):
         params4request = self.helper.get_params_for_run_with_date(date, term)
@@ -176,13 +191,46 @@ class S2MExtractor:
             endstr)
         return hash
 
-    def get_netcdf(self, date, term):
+    def _get_native_file(self, date, term):
         params4request = self.helper.get_params_for_run_with_date(date, term)
-        filename = self.get_file_hash(date, term)
-        filepath = os.path.join(self.folder, filename),
+        filename, filepath = self.get_file_location_info(date, term)
         witch = VortexWitchCraftExtractor(filepath=filepath, **params4request)
         witch.get_netcdf()
-        return filepath
+        return filename, filepath
+
+    def file_in_cache_path(self, date, term):
+        return os.path.join(
+            self.cache_folder,
+            self.get_file_hash(date, term)
+        )
+
+    def native_file_path(self, date, term):
+        return os.path.join(
+            self.native_files_folder,
+            self.get_file_hash(date, term)
+        )
+
+    def push_to_cache(self, date, term, variables):
+        """Simplissime pour l'instant on fait le choix de recopier les netcdf issus de la chaîne en entier
+        variables servira dans un premier temps pour les fichiers AROME, ensuite on
+        pourra proposer de la sous-extraction sur les fichiers S2M également
+        """
+        filename = self.get_file_hash(date, term)
+        shutil.copyfile(
+            self.native_file_path(filename),
+            self.file_in_cache_path(filename)
+        )
+
+    def read_cache(self, date, term, variable_name):
+        """FIXME: on a en gros l'idée de la lecture, homogéneïser avec les fonctions 
+        équivalentes pour les fichiers AROME et ARPEGE quand on aura mis le nez
+        dans ces derniers
+        FIXME: gestion du temps (ici decode_times=False forcé par la présence de deux
+        dimensions time pour les fichiers de la chaîne, il faudra recréer la dimension
+        temps
+        """
+        data = xr.open_dataset(self.file_in_cache_path(date, term), decode_times=False)
+        return data[variable_name].isel(time=term)
 
 
 class VortexWitchCraftExtractor(S2MTaskMixIn):
