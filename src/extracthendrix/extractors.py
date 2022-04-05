@@ -6,24 +6,26 @@ import shutil
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
 import xarray as xr
+import usevortex
 
 from extracthendrix.core import get_model_description
 
 # large extrait des variables S2M profils à donner en argument aux différentes fonctions
 # de lecture ci-dessous
 variables_S2M_PRO = [
-        'ZS', 'aspect', 'slope', 'massif_num', 'longitude', 'latitude',
-        'time', 'TG1', 'TG4', 'WG1', 'WGI1', 'WSN_VEG', 'RSN_VEG', 'ASN_VEG',
-        'NAT_LEV', 'AVA_TYP', 'TALB_ISBA', 'RN_ISBA', 'H_ISBA', 'LE_ISBA',
-        'GFLUX_ISBA', 'EVAP_ISBA', 'SWD_ISBA', 'SWU_ISBA', 'LWD_ISBA', 'LWU_ISBA',
-        'DRAIN_ISBA', 'RUNOFF_ISBA', 'SNOMLT_ISBA', 'RAINF_ISBA', 'TS_ISBA',
-        'WSN_T_ISBA', 'DSN_T_ISBA', 'SD_1DY_ISBA', 'SD_3DY_ISBA', 'SD_5DY_ISBA', 
-        'SD_7DY_ISBA', 'SWE_1DY_ISBA', 'SWE_3DY_ISBA', 'SWE_5DY_ISBA', 'SWE_7DY_ISBA',
-        'RAMSOND_ISBA', 'WET_TH_ISBA', 'REFRZTH_ISBA', 'DEP_HIG', 'DEP_MOD',
-        'ACC_LEV', 'SYTFLX_ISBA', 'SNOWLIQ', 'SNOWTEMP', 'SNOWDZ', 'SNOWDEND',
-        'SNOWSPHER', 'SNOWSIZE', 'SNOWSSA', 'SNOWTYPE', 'SNOWRAM', 'SNOWSHEAR',
-        'ACC_RAT', 'NAT_RAT', 'massif', 'naturalIndex'
-        ]
+    'ZS', 'aspect', 'slope', 'massif_num', 'longitude', 'latitude',
+    'time', 'TG1', 'TG4', 'WG1', 'WGI1', 'WSN_VEG', 'RSN_VEG', 'ASN_VEG',
+    'NAT_LEV', 'AVA_TYP', 'TALB_ISBA', 'RN_ISBA', 'H_ISBA', 'LE_ISBA',
+    'GFLUX_ISBA', 'EVAP_ISBA', 'SWD_ISBA', 'SWU_ISBA', 'LWD_ISBA', 'LWU_ISBA',
+    'DRAIN_ISBA', 'RUNOFF_ISBA', 'SNOMLT_ISBA', 'RAINF_ISBA', 'TS_ISBA',
+    'WSN_T_ISBA', 'DSN_T_ISBA', 'SD_1DY_ISBA', 'SD_3DY_ISBA', 'SD_5DY_ISBA',
+    'SD_7DY_ISBA', 'SWE_1DY_ISBA', 'SWE_3DY_ISBA', 'SWE_5DY_ISBA', 'SWE_7DY_ISBA',
+    'RAMSOND_ISBA', 'WET_TH_ISBA', 'REFRZTH_ISBA', 'DEP_HIG', 'DEP_MOD',
+    'ACC_LEV', 'SYTFLX_ISBA', 'SNOWLIQ', 'SNOWTEMP', 'SNOWDZ', 'SNOWDEND',
+    'SNOWSPHER', 'SNOWSIZE', 'SNOWSSA', 'SNOWTYPE', 'SNOWRAM', 'SNOWSHEAR',
+    'ACC_RAT', 'NAT_RAT', 'massif', 'naturalIndex'
+]
+
 
 class RunDoesntExistException(Exception):
     pass
@@ -136,6 +138,7 @@ class S2MArgHelper:
     def get_params_for_run(self, term=None):
         """
         term: échéance en nombre entier - éventuellement négatif - d'heures
+        FIXME: pas lumineux à soigner...
         """
         if 'geometry' not in self.s2m_args:
             raise GeometryIsMissingException()
@@ -147,6 +150,8 @@ class S2MArgHelper:
         return dict(run[0], geometry=self.s2m_args['geometry'])
 
     def get_params_for_run_with_date(self, date, term):
+        """FIXME: pas totalement lumineux
+        """
         run = self.get_params_for_run(term=term)
         rundatetime = datetime.combine(
             date=date, time=self.s2m_args['runtime'])
@@ -164,7 +169,21 @@ class S2MArgHelper:
         return params
 
 
-class S2MExtractor:
+class Extractor:
+    def file_in_cache_path(self, date, term):
+        return os.path.join(
+            self.cache_folder,
+            self.get_file_hash(date, term)
+        )
+
+    def native_file_path(self, date, term):
+        return os.path.join(
+            self.native_files_folder,
+            self.get_file_hash(date, term)
+        )
+
+
+class S2MExtractor(Extractor):
     def __init__(self, native_files_folder=None, cache_folder=None, s2mArgHelper=S2MArgHelper()):
         self.helper = s2mArgHelper
         self.native_files_folder = native_files_folder
@@ -193,22 +212,19 @@ class S2MExtractor:
 
     def _get_native_file(self, date, term):
         params4request = self.helper.get_params_for_run_with_date(date, term)
-        filename, filepath = self.get_file_location_info(date, term)
-        witch = VortexWitchCraftExtractor(filepath=filepath, **params4request)
-        witch.get_netcdf()
-        return filename, filepath
-
-    def file_in_cache_path(self, date, term):
-        return os.path.join(
-            self.cache_folder,
-            self.get_file_hash(date, term)
-        )
-
-    def native_file_path(self, date, term):
-        return os.path.join(
+        filepath = os.path.join(
             self.native_files_folder,
-            self.get_file_hash(date, term)
-        )
+            self.get_file_hash(date, term))
+        if os.path.isfile(filepath):
+            # comme on a plusieurs échéances dans le même fichier, on peut
+            # demander plusieurs fois le même, on s'assure ici que ça n'arrive
+            # pas
+            return filepath
+        witch = VortexWitchCraftExtractor(
+            filepath=filepath,
+            **params4request)
+        witch.get_netcdf()
+        return filepath
 
     def push_to_cache(self, date, term, variables):
         """Simplissime pour l'instant on fait le choix de recopier les netcdf issus de la chaîne en entier
@@ -229,7 +245,8 @@ class S2MExtractor:
         dimensions time pour les fichiers de la chaîne, il faudra recréer la dimension
         temps
         """
-        data = xr.open_dataset(self.file_in_cache_path(date, term), decode_times=False)
+        data = xr.open_dataset(self.file_in_cache_path(
+            date, term), decode_times=False)
         return data[variable_name].isel(time=term)
 
 
@@ -252,3 +269,64 @@ class VortexWitchCraftExtractor(S2MTaskMixIn):
     def get_netcdf(self):
         tb = toolbox.input(**self.resource_description)
         tb[0].get()
+
+
+class AromeExtractor(Extractor):
+    def __init__(self, native_files_folder=None, cache_folder=None, model=None, runtime=None):
+        self.native_files_folder = native_files_folder
+        self.cache_folder = cache_folder
+        self.runtime = runtime
+        self.model_name = model
+        # ce dernier attribut est une liste, contenant les valeurs possibles des paramètres pour un même modèle (elles peuvent changer!!!)
+        self.model_description_and_alternative_parameters = get_model_description(
+            model)
+
+    def get_file_hash(self, date, term):
+        hash = "%s-run:%sT%s:00:00Z-term:%sh.FA" % (
+            self.model_name,
+            date.strftime("%Y%m%d"),
+            self.runtime.strftime("%H"),
+            term)
+        return hash
+
+    def _get_native_file(self, date, term):
+        """
+        """
+        filepath = self.native_file_path(date, term)
+        params = [dict(
+            **model_description,
+            date=datetime.combine(date=date, time=self.runtime),
+            term=term,
+            local=os.path.join(self.native_files_folder,
+                               self.get_file_hash(date, term))
+        ) for model_description in self.model_description_and_alternative_parameters]
+
+        last_exception = None
+        for param in params:
+            try:
+                result = usevortex.get_resources(getmode='epygram', **param)
+                return filepath
+            except Exception as e:
+                last_exception = e
+        raise last_exception
+
+
+"""
+Décorticage core.py
+
+HendrixConductor.__init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address, delta_terms)
+    getter: 'hendrix' / 'local'
+    analysis_time: le datetime du run
+    folder: dossier de destination
+    domain: 'alp' - OU: coordonnées (cf fichier config/domains.py)
+    
+
+HendrixConductor.get_resource_from_hendrix
+    calls: get_model_description(model_name)
+    resource_description_init: la resource_descirption pour tous terms, dates,
+    incluant le nom du folder
+    calls: HendrixConductor._get_resources_vortex(resource_description_init)
+        calls: usevortex.get_resources(**resource_description)
+        (enrobé dans des try/except - gestion d'erreurs + retries - qu'on va renvoyer
+        un niveau plus haut)
+"""

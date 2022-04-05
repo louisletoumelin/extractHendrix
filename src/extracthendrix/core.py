@@ -123,19 +123,6 @@ def _send_email(type_of_email, email_address, **kwargs):
     server.quit()
 
 
-def callSystemOrDie(commande, errorcode=None):
-    """Not used"""
-    status = os.system(commande)
-    if status != 0:
-
-        if type(errorcode) is int:
-            print("The following command fails with error code " + str(status) + ":\n" + commande)
-            sys.exit(errorcode)
-        else:
-            sys.exit("The following command fails with error code " + str(status) + ":\n" + commande)
-    return status
-
-
 class CanNotReadEpygramField(Exception):
     pass
 
@@ -497,6 +484,7 @@ class HendrixConductor:
 
     def __init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address, delta_terms):
         self.folder = folder
+        self.model_description = get_model_description(model_name)
         self.analysis_time = analysis_time
         self.model_name = model_name
         self.domain = domains[domain]
@@ -596,7 +584,7 @@ class HendrixConductor:
         """function that accesses resources on hendrix. Based on Epygram "use_vortex" function."""
 
         model_name = self.model_name if model_name is None else model_name
-        model_descriptions = get_model_description(model_name)
+        model_descriptions = self.model_description
         assert isinstance(model_descriptions, list)
         assert isinstance(model_descriptions[0], dict)
 
