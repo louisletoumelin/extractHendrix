@@ -1,46 +1,37 @@
+import logging
 from datetime import timedelta, time, datetime, date
 import itertools
 import os
 import shutil
+import copy
 
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
 import xarray as xr
 import usevortex
+import numpy as np
+import epygram
 
-from extracthendrix.core import get_model_description
+from extracthendrix.core import get_model_description, CanNotReadEpygramField, CanNotAccessVortexResource
+from extracthendrix.config.config_fa_or_grib2nc import transformations, alternatives_names_fa
+from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMatchException, GeometryIsMissingException
 
-# large extrait des variables S2M profils à donner en argument aux différentes fonctions
-# de lecture ci-dessous
-variables_S2M_PRO = [
-    'ZS', 'aspect', 'slope', 'massif_num', 'longitude', 'latitude',
-    'time', 'TG1', 'TG4', 'WG1', 'WGI1', 'WSN_VEG', 'RSN_VEG', 'ASN_VEG',
-    'NAT_LEV', 'AVA_TYP', 'TALB_ISBA', 'RN_ISBA', 'H_ISBA', 'LE_ISBA',
-    'GFLUX_ISBA', 'EVAP_ISBA', 'SWD_ISBA', 'SWU_ISBA', 'LWD_ISBA', 'LWU_ISBA',
-    'DRAIN_ISBA', 'RUNOFF_ISBA', 'SNOMLT_ISBA', 'RAINF_ISBA', 'TS_ISBA',
-    'WSN_T_ISBA', 'DSN_T_ISBA', 'SD_1DY_ISBA', 'SD_3DY_ISBA', 'SD_5DY_ISBA',
-    'SD_7DY_ISBA', 'SWE_1DY_ISBA', 'SWE_3DY_ISBA', 'SWE_5DY_ISBA', 'SWE_7DY_ISBA',
-    'RAMSOND_ISBA', 'WET_TH_ISBA', 'REFRZTH_ISBA', 'DEP_HIG', 'DEP_MOD',
-    'ACC_LEV', 'SYTFLX_ISBA', 'SNOWLIQ', 'SNOWTEMP', 'SNOWDZ', 'SNOWDEND',
-    'SNOWSPHER', 'SNOWSIZE', 'SNOWSSA', 'SNOWTYPE', 'SNOWRAM', 'SNOWSHEAR',
-    'ACC_RAT', 'NAT_RAT', 'massif', 'naturalIndex'
-]
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
-class RunDoesntExistException(Exception):
-    pass
+class HendrixFileReader:
+    def file_in_cache_path(self, date, term):
+        return os.path.join(
+            self.cache_folder,
+            self.get_file_hash(date, term)
+        )
 
-
-class MoreThanOneRunMatchException(Exception):
-    pass
-
-
-class GeometryIsMissingException(Exception):
-    pass
-
-
-class Config(object):
-    pass
+    def native_file_path(self, date, term):
+        return os.path.join(
+            self.native_files_folder,
+            self.get_file_hash(date, term)
+        )
 
 
 available_combinations = [
@@ -169,21 +160,7 @@ class S2MArgHelper:
         return params
 
 
-class Extractor:
-    def file_in_cache_path(self, date, term):
-        return os.path.join(
-            self.cache_folder,
-            self.get_file_hash(date, term)
-        )
-
-    def native_file_path(self, date, term):
-        return os.path.join(
-            self.native_files_folder,
-            self.get_file_hash(date, term)
-        )
-
-
-class S2MExtractor(Extractor):
+class S2MHendrixReader(HendrixFileReader):
     def __init__(self, native_files_folder=None, cache_folder=None, s2mArgHelper=S2MArgHelper()):
         self.helper = s2mArgHelper
         self.native_files_folder = native_files_folder
@@ -210,7 +187,7 @@ class S2MExtractor(Extractor):
             endstr)
         return hash
 
-    def _get_native_file(self, date, term):
+    def get_native_file(self, date, term):
         params4request = self.helper.get_params_for_run_with_date(date, term)
         filepath = os.path.join(
             self.native_files_folder,
@@ -220,7 +197,7 @@ class S2MExtractor(Extractor):
             # demander plusieurs fois le même, on s'assure ici que ça n'arrive
             # pas
             return filepath
-        witch = VortexWitchCraftExtractor(
+        witch = VortexWitchCraftReader(
             filepath=filepath,
             **params4request)
         witch.get_netcdf()
@@ -250,7 +227,11 @@ class S2MExtractor(Extractor):
         return data[variable_name].isel(time=term)
 
 
-class VortexWitchCraftExtractor(S2MTaskMixIn):
+class Config(object):
+    pass
+
+
+class VortexWitchCraftReader(S2MTaskMixIn):
     def __init__(self, filepath=None, model=None, geometry=None, previ=None, member=None, rundatetime=None, datebegin=None, dateend=None):
         self.conf = Config()
         self.resource_description = get_model_description(model)[0]
@@ -271,10 +252,9 @@ class VortexWitchCraftExtractor(S2MTaskMixIn):
         tb[0].get()
 
 
-class AromeExtractor(Extractor):
-    def __init__(self, native_files_folder=None, cache_folder=None, model=None, runtime=None):
+class AromeHendrixReader(HendrixFileReader):
+    def __init__(self, native_files_folder=None, model=None, runtime=None):
         self.native_files_folder = native_files_folder
-        self.cache_folder = cache_folder
         self.runtime = runtime
         self.model_name = model
         # ce dernier attribut est une liste, contenant les valeurs possibles des paramètres pour un même modèle (elles peuvent changer!!!)
@@ -289,10 +269,7 @@ class AromeExtractor(Extractor):
             term)
         return hash
 
-    def _get_native_file(self, date, term):
-        """
-        """
-        filepath = self.native_file_path(date, term)
+    def _get_vortex_params(self, date, term):
         params = [dict(
             **model_description,
             date=datetime.combine(date=date, time=self.runtime),
@@ -300,33 +277,20 @@ class AromeExtractor(Extractor):
             local=os.path.join(self.native_files_folder,
                                self.get_file_hash(date, term))
         ) for model_description in self.model_description_and_alternative_parameters]
+        return params
 
+    def get_native_file(self, date, term):
+        """
+        """
+        filepath = self.native_file_path(date, term)
+        # on vérifie s'il n'existe pas déjà
+        if os.path.isfile(filepath):
+            return filepath
         last_exception = None
-        for param in params:
+        for param in self._get_vortex_params(date, term):
             try:
-                result = usevortex.get_resources(getmode='epygram', **param)
+                usevortex.get_resources(getmode='epygram', **param)
                 return filepath
             except Exception as e:
                 last_exception = e
         raise last_exception
-
-
-"""
-Décorticage core.py
-
-HendrixConductor.__init__(self, getter, folder, model_name, analysis_time, domain, variables_nc, email_address, delta_terms)
-    getter: 'hendrix' / 'local'
-    analysis_time: le datetime du run
-    folder: dossier de destination
-    domain: 'alp' - OU: coordonnées (cf fichier config/domains.py)
-    
-
-HendrixConductor.get_resource_from_hendrix
-    calls: get_model_description(model_name)
-    resource_description_init: la resource_descirption pour tous terms, dates,
-    incluant le nom du folder
-    calls: HendrixConductor._get_resources_vortex(resource_description_init)
-        calls: usevortex.get_resources(**resource_description)
-        (enrobé dans des try/except - gestion d'erreurs + retries - qu'on va renvoyer
-        un niveau plus haut)
-"""

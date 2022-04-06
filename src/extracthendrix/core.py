@@ -36,6 +36,7 @@ from extracthendrix.config.config_fa_or_grib2nc import transformations, alternat
 from extracthendrix.config.domains import domains
 from extracthendrix.config.post_processing_functions import *
 from extracthendrix.hendrix_emails import dict_with_all_emails, _prepare_html
+from extracthendrix.exceptions import CanNotReadEpygramField, CanNotAccessVortexResource
 
 
 logger = logging.getLogger(__name__)
@@ -121,14 +122,6 @@ def _send_email(type_of_email, email_address, **kwargs):
         logger.error(f"Email {type_of_email} could not be launched. The error is: {e}\n\n")
 
     server.quit()
-
-
-class CanNotReadEpygramField(Exception):
-    pass
-
-
-class CanNotAccessVortexResource(Exception):
-    pass
 
 
 def print_documentation():
