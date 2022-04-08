@@ -28,7 +28,3 @@ with arome_cache_manager.read_cache(wished_date, term, 'CLSVENT.ZONAL') as datas
 
 variable = 'CLSVENT.ZONAL'
 print(var.latitude)
-
-
-# file = list(arome_cache_manager.opened_files.values())[0]
-# file['dataset'].set_coords(['latitude', 'longitude'])
