@@ -1,8 +1,8 @@
+from extracthendrix import AromeCacheManager
 from datetime import timedelta, time, datetime, date
 from pprint import pprint
 from extracthendrix.cache import AromeCacheManager
-import epygram
-
+from extracthendrix.writers import dataConcatenator
 
 native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
 cache_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_cache_"
@@ -18,17 +18,12 @@ arome_cache_manager = AromeCacheManager(
     runtime=time(0)
 )
 
-wished_date = date(2022, 4, 7)
-term = 3
+dates = [
+    date(2022, 4, 5),
+    date(2022, 4, 6),
+    date(2022, 4, 7)
+]
 
-# arome_cache_manager.put_in_cache(wished_date, term)
+terms = [3]
 
-with arome_cache_manager.read_cache(wished_date, term, 'CLSVENT.ZONAL') as dataset:
-    var = dataset
-
-variable = 'CLSVENT.ZONAL'
-print(var.latitude)
-
-
-# file = list(arome_cache_manager.opened_files.values())[0]
-# file['dataset'].set_coords(['latitude', 'longitude'])
+final_dataset = dataConcatenator(dates, terms, arome_cache_manager)

@@ -1,9 +1,12 @@
 import os
 import copy
 import logging
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 import numpy as np
 import epygram
+import xarray as xr
 
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains
@@ -33,11 +36,14 @@ variables_S2M_PRO = [
 
 class AromeCacheManager:
     def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None, runtime=None):
+        self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(
             native_files_folder, model, runtime)
         self.domain = domains[domain]
         self.variables = variables
         self.cache_folder = cache_folder
+        self.runtime = runtime
+        self.opened_files = {}
 
     def get_cache_path(self, date, term):
         return "%s.nc" % (os.path.join(
@@ -149,3 +155,34 @@ class AromeCacheManager:
         # self.write_time_in_txt_file(field) => on verra plus tard
         logger.debug(
             f"Successfully converted a fa file to netcdf for term {term}\n\n")
+
+    def open_file_as_dataset(self, date, term):
+        filepath = self.get_cache_path(date, term)
+        dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
+        if filepath not in self.opened_files:
+            self.opened_files[filepath] = dict(
+                dataset=dataset,
+                variables_read={variable: False for variable in self.variables}
+            )
+        return self.opened_files[filepath]
+
+    def close_file(self, date, term):
+        filepath = self.get_cache_path(date, term)
+        file = self.opened_files[filepath]
+        file['dataset'].close()
+        del self.opened_files[filepath]
+
+    @contextmanager
+    def read_cache(self, date, term, variable):
+        file = self.open_file_as_dataset(date, term)
+        dataset = xr.Dataset(
+            {
+                variable: file['dataset'][variable],
+                'time': datetime.combine(date, self.runtime) + timedelta(hours=term)
+            }
+        )
+        yield dataset
+        variables_read = file['variables_read']
+        variables_read[variable] = True
+        if all(variables_read.values()):
+            self.close_file(date, term)
