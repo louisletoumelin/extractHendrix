@@ -3,6 +3,7 @@ from datetime import timedelta, time, datetime, date
 from pprint import pprint
 from extracthendrix.cache import AromeCacheManager
 from extracthendrix.writers import dataConcatenator
+from extracthendrix.config.variables import arome, arome_surface
 
 native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
 cache_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_cache_"
@@ -10,7 +11,7 @@ cache_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_cache_"
 
 arome_cache_manager = AromeCacheManager(
     domain='alp',
-    variables=['S090HUMI.SPECIFI', 'CLSHUMI.RELATIVE',
+    variables=['CLSTEMPERATURE', 'S090TEMPERATURE',
                'CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
     native_files_folder=native_files_folder,
     cache_folder=cache_folder,
@@ -18,12 +19,14 @@ arome_cache_manager = AromeCacheManager(
     runtime=time(0)
 )
 
-dates = [
-    date(2022, 4, 5),
-    date(2022, 4, 6),
-    date(2022, 4, 7)
+dateiterator = [
+    (datetime(2022, 4, 10, 0, 0), 6),
+    (datetime(2022, 4, 10, 0, 0), 7),
+    (datetime(2022, 4, 10, 0, 0), 8),
+    (datetime(2022, 4, 10, 0, 0), 9),
+    (datetime(2022, 4, 10, 0, 0), 10),
+    (datetime(2022, 4, 10, 0, 0), 11),
+    (datetime(2022, 4, 10, 0, 0), 12)
 ]
 
-terms = [3]
-
-final_dataset = dataConcatenator(dates, terms, arome_cache_manager)
+final_dataset = dataConcatenator(dateiterator, arome_cache_manager)

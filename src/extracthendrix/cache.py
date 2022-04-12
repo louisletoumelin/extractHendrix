@@ -35,7 +35,8 @@ variables_S2M_PRO = [
 
 
 class AromeCacheManager:
-    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None, runtime=None):
+    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None, runtime=None, delete_native=False):
+        self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(
             native_files_folder, model, runtime)
@@ -134,8 +135,10 @@ class AromeCacheManager:
         :param term: forecast leadtime
         :type term: int
         """
+
+        native_file_path = self.extractor.get_native_file(date, term)
         input_resource = epygram.formats.resource(
-            self.extractor.get_native_file(date, term),
+            native_file_path,
             'r',
             fmt='FA')
         cache_path = self.get_cache_path(date, term)
@@ -155,6 +158,8 @@ class AromeCacheManager:
         # self.write_time_in_txt_file(field) => on verra plus tard
         logger.debug(
             f"Successfully converted a fa file to netcdf for term {term}\n\n")
+        if self.delete_native:
+            os.remove(native_file_path)
 
     def open_file_as_dataset(self, date, term):
         filepath = self.get_cache_path(date, term)
@@ -173,7 +178,7 @@ class AromeCacheManager:
         del self.opened_files[filepath]
 
     @contextmanager
-    def read_cache(self, date, term, variable):
+    def read_cache_and_manage_opened_files(self, date, term, variable):
         file = self.open_file_as_dataset(date, term)
         dataset = xr.Dataset(
             {
@@ -181,8 +186,13 @@ class AromeCacheManager:
                 'time': datetime.combine(date, self.runtime) + timedelta(hours=term)
             }
         )
-        yield dataset
+        yield dataset.set_coords(['time'])[variable]
         variables_read = file['variables_read']
         variables_read[variable] = True
         if all(variables_read.values()):
             self.close_file(date, term)
+
+    def read_cache(self, date, term, variable):
+        with self.read_cache_and_manage_opened_files(date, term, variable) as array:
+            returned_array = array
+        return returned_array

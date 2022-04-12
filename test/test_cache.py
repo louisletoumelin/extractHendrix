@@ -18,13 +18,9 @@ arome_cache_manager = AromeCacheManager(
     runtime=time(0)
 )
 
-wished_date = date(2022, 4, 7)
-term = 3
+wished_date = date(2022, 4, 12)
+term = 9
 
-# arome_cache_manager.put_in_cache(wished_date, term)
+arome_cache_manager.put_in_cache(wished_date, term)
 
-with arome_cache_manager.read_cache(wished_date, term, 'CLSVENT.ZONAL') as dataset:
-    var = dataset
-
-variable = 'CLSVENT.ZONAL'
-print(var.latitude)
+ventz = arome_cache_manager.read_cache(wished_date, term, 'CLSVENT.ZONAL')
