@@ -35,7 +35,7 @@ variables_S2M_PRO = [
 
 
 class AromeCacheManager:
-    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None, runtime=None, delete_native=False):
+    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None, runtime=None, delete_native=True):
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(
