@@ -4,6 +4,8 @@ import itertools
 import os
 import shutil
 import copy
+import configparser
+import pkg_resources
 
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
@@ -12,12 +14,36 @@ import usevortex
 import numpy as np
 import epygram
 
-from extracthendrix.core import get_model_description, CanNotReadEpygramField, CanNotAccessVortexResource
+# from extracthendrix.core import get_model_description, CanNotReadEpygramField, CanNotAccessVortexResource
 from extracthendrix.config.config_fa_or_grib2nc import transformations, alternatives_names_fa
 from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMatchException, GeometryIsMissingException
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+def model_ini_to_dict(model_name):
+    """Converts config/models.ini into a dictionary"""
+    config = configparser.ConfigParser()
+    models_path = pkg_resources.resource_filename(
+        'extracthendrix.config', 'models.ini')
+    config.read(models_path)
+    dict_model = dict(config[model_name])
+    return dict_model
+
+
+def get_model_description(model_name):
+    """Get vortex description of a model"""
+
+    dict_model = model_ini_to_dict(model_name)
+
+    for key in dict_model.keys():
+        dict_model[key] = dict_model[key].split(',')
+
+    keys, values = zip(*dict_model.items())
+    list_dict_models = [dict(zip(keys, v)) for v in itertools.product(*values)]
+
+    return list_dict_models
 
 
 class HendrixFileReader:
@@ -273,10 +299,14 @@ class AromeHendrixReader(HendrixFileReader):
         params = [dict(
             **model_description,
             date=datetime.combine(date=date, time=self.runtime),
-            term=term,
-            local=os.path.join(self.native_files_folder,
-                               self.get_file_hash(date, term))
+            term=term
         ) for model_description in self.model_description_and_alternative_parameters]
+        if self.native_files_folder is None:
+            return params
+        for param in params:
+            param['local'] = os.path.join(
+                self.native_files_folder,
+                self.get_file_hash(date, term))
         return params
 
     def get_native_file(self, date, term):

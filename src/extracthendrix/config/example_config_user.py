@@ -8,7 +8,7 @@ config_user = dict(
     variables_nc=[arome.Tair, arome.T1,
                   arome.Wind, arome.ts, arome_surface.SWE],
     mode="timeseries",
-    email_address="hugo.merzisen@meteo.fr",
+    email_adress="hugo.merzisen@meteo.fr",
     date_start=datetime(2022, 4, 10),
     date_end=datetime(2022, 4, 11),
     analysis_hour=0,

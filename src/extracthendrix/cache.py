@@ -142,6 +142,8 @@ class AromeCacheManager:
             'r',
             fmt='FA')
         cache_path = self.get_cache_path(date, term)
+        if os.path.isfile(cache_path):
+            return
         output_resource = epygram.formats.resource(
             cache_path,
             'w',
@@ -155,7 +157,6 @@ class AromeCacheManager:
                 field.sp2gp()
             field = self.extract_subgrid(field)
             output_resource.writefield(field)
-        # self.write_time_in_txt_file(field) => on verra plus tard
         logger.debug(
             f"Successfully converted a fa file to netcdf for term {term}\n\n")
         if self.delete_native:

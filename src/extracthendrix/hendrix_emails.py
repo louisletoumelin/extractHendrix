@@ -1,3 +1,17 @@
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formatdate
+import logging
+import warnings
+import time
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 dict_with_all_emails = \
     dict(
         problem_extraction=(
@@ -60,8 +74,8 @@ dict_with_all_emails = \
             """),
 
         script_stopped=(
-                "Extraction on Hendrix didn't work",
-                """
+            "Extraction on Hendrix didn't work",
+            """
                 <p> Dear {user}, </p>
                 <p> </p>
                 <p> <strong> Your extraction on Hendrix didn't work. </strong></p>
@@ -78,86 +92,58 @@ dict_with_all_emails = \
                 <p> HendrixConductor </p>
                 <p> </p>
                 <p> </p>
-                """),
-
-        extracted_first_half=(
-            "Your extraction on Hendrix is on its way",
-            """
-            <p> Dear {user}, </p>
-            <p> </p>
-            <p> <strong> We downloaded half of your data on Hendrix. </strong></p>
-            <p> The configuration is: </p>
-            <p style = "text-align: center;" > {config_user} </p>
-            <p> Total time to download 50% of the files: </p>
-            <p style = "text-align: center;"> {time_to_download} hours </p>
-            <p> If an error occured it should be listed below:</p>
-            <p style = "text-align: center;" > {error} </p>
-            <p> Current time is:</p>
-            <p style = "text-align: center;" > {current_time} </p>
-            <p style = "text-align: left;"> We remind you that we are working here: </p>
-            <p style = "text-align: center;">  {folder} </p>
-            <pstyle="margin-bottom:1.5cm;"> </p>
-            <p> </p>
-            <p> HendrixConductor </p>
-            <p> </p>
-            <p> </p>
-            """)
+                """)
     )
+
+
+def send_email(email_address, subject, content):
+    """Send email to email_address using Météo-France network"""
+    server = smtplib.SMTP()
+    server.connect('smtp.cnrm.meteo.fr')
+    server.helo()
+    from_addr = 'HendrixConductor <do_not_answer@hendrixconductor.fr>'
+    to_addrs = email_address if isinstance(
+        email_address, list) else [email_address]
+    msg = MIMEMultipart('alternative')
+    msg['From'] = from_addr
+    msg['To'] = ','.join(to_addrs)
+    msg["Date"] = formatdate(localtime=True)
+    msg['Subject'] = subject
+    part = MIMEText(content, 'html')
+    msg.attach(part)
+    try:
+        server.sendmail(from_addr, to_addrs, msg.as_string())
+        logger.info(f"Successfully sent an email to {to_addrs}\n\n")
+    except smtplib.SMTPException as e:
+        logger.error(
+            f"Email could not be launched. The error is: {e}\n\n")
+    server.quit()
 
 
 def get_first_and_last_name_from_email(email_address):
     return email_address.split("@")[0].replace('.', ' ').title()
 
 
-def _prepare_html(type_of_email, email_address, **kwargs):
-    """Returns the subject of the mail (str) and the message (html)"""
+def finished_email(email_adress=None, config_user=None, current_time=None, time_to_download=None, errors=None, folder=None):
+    user = get_first_and_last_name_from_email(email_adress)
+    html = dict_with_all_emails["finished"][1].format(**locals())
+    subject = dict_with_all_emails["finished"][0]
+    send_email(email_adress, subject, html)
+    return
 
-    user = get_first_and_last_name_from_email(email_address)
 
-    if type_of_email == "problem_extraction":
+def problem_extraction_email(email_adress=None, error_message=None, time_of_problem=None, resource_that_stopped=None, folder=None, nb_of_try=None, time_waiting=None):
+    user = get_first_and_last_name_from_email(email_adress)
+    html = dict_with_all_emails["problem_extraction"][1].format(
+        **locals(), user=user)
+    subject = dict_with_all_emails["problem_extraction"][0]
+    send_email(email_adress, subject, html)
+    return
 
-        kwargs_html = dict(
-            user=user,
-            error_message=kwargs.get("error_message"),
-            time_of_problem=kwargs.get("time_of_problem"),
-            resource_that_stopped=kwargs.get("resource_that_stopped"),
-            folder=kwargs.get("folder"),
-            nb_of_try=kwargs.get("nb_of_try"),
-            time_waiting=kwargs.get("time_waiting"),
-        )
 
-    if type_of_email == "finished":
-
-        kwargs_html = dict(
-            user=user,
-            config_user=kwargs.get("config_user"),
-            current_time=kwargs.get("current_time"),
-            time_to_download=kwargs.get("time_to_download"),
-            errors=kwargs.get("errors"),
-            folder=kwargs.get("folder"),
-        )
-
-    if type_of_email == "script_stopped":
-
-        kwargs_html = dict(
-            user=user,
-            config_user=kwargs.get("config_user"),
-            current_time=kwargs.get("current_time"),
-            error=kwargs.get("error"),
-            folder=kwargs.get("folder"),
-        )
-
-    if type_of_email == "extracted_first_half":
-
-        kwargs_html = dict(
-            user=user,
-            config_user=kwargs.get("config_user"),
-            current_time=kwargs.get("current_time"),
-            time_to_download=kwargs.get("time_to_download"),
-            errors=kwargs.get("errors"),
-            folder=kwargs.get("folder"),
-        )
-
-    html = dict_with_all_emails[type_of_email][1].format(**kwargs_html)
-
-    return html
+def script_stopped_email(email_adress=None, config_user=None, current_time=None, error=None, folder=None):
+    user = get_first_and_last_name_from_email(email_adress)
+    html = dict_with_all_emails["script_stopped"][1].format(
+        **locals())
+    subject = dict_with_all_emails["script_stopped"][0]
+    send_email(email_adress, subject, html)
