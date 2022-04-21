@@ -124,7 +124,7 @@ def get_first_and_last_name_from_email(email_address):
     return email_address.split("@")[0].replace('.', ' ').title()
 
 
-def finished_email(email_adress=None, config_user=None, current_time=None, time_to_download=None, errors=None, folder=None):
+def send_succes_email(email_adress=None, config_user=None, current_time=None, time_to_download=None, errors=None, folder=None):
     user = get_first_and_last_name_from_email(email_adress)
     html = dict_with_all_emails["finished"][1].format(**locals())
     subject = dict_with_all_emails["finished"][0]
@@ -132,16 +132,16 @@ def finished_email(email_adress=None, config_user=None, current_time=None, time_
     return
 
 
-def problem_extraction_email(email_adress=None, error_message=None, time_of_problem=None, resource_that_stopped=None, folder=None, nb_of_try=None, time_waiting=None):
+def send_problem_extraction_email(email_adress=None, error_message=None, time_of_problem=None, resource_that_stopped=None, folder=None, nb_of_try=None, time_waiting=None):
     user = get_first_and_last_name_from_email(email_adress)
     html = dict_with_all_emails["problem_extraction"][1].format(
-        **locals(), user=user)
+        **locals())
     subject = dict_with_all_emails["problem_extraction"][0]
     send_email(email_adress, subject, html)
     return
 
 
-def script_stopped_email(email_adress=None, config_user=None, current_time=None, error=None, folder=None):
+def send_script_stopped_email(email_adress=None, config_user=None, current_time=None, error=None, folder=None):
     user = get_first_and_last_name_from_email(email_adress)
     html = dict_with_all_emails["script_stopped"][1].format(
         **locals())

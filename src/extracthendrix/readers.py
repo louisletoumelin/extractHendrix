@@ -318,6 +318,9 @@ class AromeHendrixReader(HendrixFileReader):
             return filepath
         last_exception = None
         for param in self._get_vortex_params(date, term):
+            # ici au cas ou il y ait plusieurs combinaisons de paramètres vortex
+            # valables à différents instants pour le même modèle, on les
+            # essaie successivement
             try:
                 usevortex.get_resources(getmode='epygram', **param)
                 return filepath

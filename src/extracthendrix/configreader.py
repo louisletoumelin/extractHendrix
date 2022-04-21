@@ -5,8 +5,8 @@ from datetime import time, timedelta
 from functools import reduce
 import os
 
-from extracthendrix.cache import AromeCacheManager
-from extracthendrix.hendrix_emails import finished_email, problem_extraction_email, script_stopped_email
+from extracthendrix.cache import AromeCacheManager, retry_and_finally_raise
+from extracthendrix.hendrix_emails import send_succes_email
 
 
 native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
@@ -24,6 +24,7 @@ def get_native_vars(variables):
 class ConfigReader:
     def __init__(self, config_user):
         self.__dict__ = config_user
+        self.config_user = config_user
         self._set_cache_managers()
 
     def dateiterator(self):
@@ -70,20 +71,16 @@ def compute_final_variable(read_cache, date, term, final_variable):
 
 def apply_config_user(config_user):
     timebegin = timemodule.time()
+    time_retries = [timedelta(hours=1), timedelta(
+        hours=2), timedelta(hours=3), timedelta(hours=6)]
     configReader = ConfigReader(config_user)
     for cache_manager in configReader.cache_managers.values():
         for date_, term in configReader.dateiterator():
-            try:
-                cache_manager.put_in_cache(date_, term)
-                print(date_, term, 'IN CACHE')
-            except Exception as e:
-                script_stopped_email(
-                    email_adress=configReader.email_adress,
-                    config_user=config_user,
-                    current_time=timemodule.asctime(),
-                    error=e,
-                    folder=folder
-                )
+            retry_and_finally_raise(
+                cache_manager.put_in_cache,
+                configReader,
+                time_retries
+            )(date_, term)
     variables_storage = defaultdict(lambda: [])
     for model_name, variables in configReader.sort_variables_by_model().items():
         for date_, term in configReader.dateiterator():
@@ -102,11 +99,11 @@ def apply_config_user(config_user):
     )
     final_dataset.to_netcdf(os.path.join(
         configReader.folder, "monextraction.nc"))
-    finished_email(email_adress=configReader.email_adress,
-                   config_user=config_user,
-                   current_time=timemodule.asctime(),
-                   time_to_download=timemodule.time() - timebegin,
-                   errors=None,
-                   folder=configReader.folder
-                   )
+    send_succes_email(email_adress=configReader.email_adress,
+                      config_user=config_user,
+                      current_time=timemodule.asctime(),
+                      time_to_download=timemodule.time() - timebegin,
+                      errors=None,
+                      folder=configReader.folder
+                      )
     return final_dataset

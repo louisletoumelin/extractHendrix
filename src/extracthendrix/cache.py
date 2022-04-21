@@ -3,10 +3,12 @@ import copy
 import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+import time as timeutils
 
 import numpy as np
 import epygram
 import xarray as xr
+from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email
 
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains
@@ -32,6 +34,43 @@ variables_S2M_PRO = [
     'SNOWSPHER', 'SNOWSIZE', 'SNOWSSA', 'SNOWTYPE', 'SNOWRAM', 'SNOWSHEAR',
     'ACC_RAT', 'NAT_RAT', 'massif', 'naturalIndex'
 ]
+
+
+def retry_and_finally_raise(cache_method, configReader, time_retries):
+    """
+    Args:
+    cache_method (:obj:`method`): La méthode à exécuter
+    configReader (:obj:`extractHendrix.configreader.ConfigReader`): la configuration de l'utilisateur
+    time_retries (:obj:`list` of :obj:`datetime.timedelta`): les intervalles de temps au bout desquels relancer la fonction en cas d'échec
+    """
+    def cache_method_wrapper(*args):
+        for numretry, delta in enumerate(time_retries):
+            try:
+                return cache_method(*args)
+            except Exception as E:
+                send_problem_extraction_email(
+                    email_adress=configReader.email_adress,
+                    error_message=E,
+                    time_of_problem=timeutils.asctime(),
+                    resource_that_stopped=None,
+                    folder=configReader.folder,
+                    nb_of_try=numretry+1,
+                    time_waiting=str(delta)
+                )
+                timeutils.sleep(delta.total_seconds())
+        # dernier essai avant l'abandon
+        try:
+            return cache_method(*args)
+        except Exception as E:
+            send_script_stopped_email(
+                email_adress=configReader.email_adress,
+                config_user=configReader.config_user,
+                error=E,
+                current_time=timeutils.asctime(),
+                folder=configReader.folder,
+            )
+            raise E
+    return cache_method_wrapper
 
 
 class AromeCacheManager:
