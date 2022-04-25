@@ -1,42 +1,31 @@
+import sys
 from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c, compute_wind_speed
+from . import arome_native as an
+from . import arome_surface_native as asn
+from .utils import Variable
 
 
-class Variables:
-    model_name = 'AROME'
+vars = {
+    'Tair':
+    dict(native_vars=[an.CLSTEMPERATURE],
+         compute=compute_temperature_in_degree_c,
+         original_long_name="2 m Temperature"
+         ),
+    'T1':
+    dict(native_vars=[an.S090TEMPERATURE],
+         compute=compute_temperature_in_degree_c,
+         original_long_name="Prognostic lowest level temperature"),
+    'ts':
+    dict(native_vars=[an.SURFTEMPERATURE],
+         compute=None,
+         original_long_name="Surface temperature. Ts (the one used in radiation)"),
+    'SWE':
+    dict(native_vars=[asn.X001WSN_VEG1],
+         compute=None,
+         original_long_name="contenu équivalent en eau de la neige [km m-2]")
+}
 
-    def __init__(self, variables=None, compute=None, original_long_name=None, name=None):
-        self.variables = variables
-        self.compute = compute
-        self.original_long_name = original_long_name
-        self.name = name
 
-    def __repr__(self):
-        return "%s:%s" % (self.model_name, self.original_long_name)
-
-
-Tair = Variables(
-    variables=['CLSTEMPERATURE'],
-    compute=compute_temperature_in_degree_c,
-    original_long_name="2 m Temperature",
-    name="Tair"
-)
-
-T1 = Variables(
-    variables=['S090TEMPERATURE'],
-    compute=compute_temperature_in_degree_c,
-    original_long_name="Prognostic lowest level temperature",
-    name="T1"
-)
-
-Wind = Variables(
-    variables=['CLSVENT.ZONAL', 'CLSVENT.MERIDIEN'],
-    compute=compute_wind_speed,
-    original_long_name="10 m wind speed",
-    name="Wind")
-
-ts = Variables(
-    variables=['SURFTEMPERATURE'],
-    compute=None,
-    original_long_name="Surface temperature. Ts (the one used in radiation)",
-    name='ts'
-)
+module = sys.modules[__name__]
+for name in vars:
+    setattr(module, name, Variable(**vars[name], name=name))
