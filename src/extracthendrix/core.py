@@ -589,6 +589,7 @@ class HendrixConductor:
         ) for model_description in model_descriptions]
 
         resource = self._get_resources_vortex(resource_descriptions)
+        print("resource list ? ", isinstance(resource,list))
         resource = resource[0] if isinstance(resource, list) else resource
 
         return resource

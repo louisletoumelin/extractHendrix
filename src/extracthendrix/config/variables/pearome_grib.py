@@ -10,4 +10,4 @@ vars = {'t2m': dict(shortName='2t', productDefinitionTemplateNumber=1),
 module = sys.modules[__name__]
 for name, gribdict in vars.items():
     setattr(module, name,
-            NativeVariable(model_name=model, name=gribdict))
+            NativeVariable(model_name=model, name=gribdict, outname=name))

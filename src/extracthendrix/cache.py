@@ -74,11 +74,15 @@ def retry_and_finally_raise(cache_method, configReader, time_retries):
 
 
 class AromeCacheManager:
-    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None, runtime=None, delete_native=True):
+    """
+
+    """
+    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None,
+                 runtime=None, delete_native=True, member=None):
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(
-            native_files_folder, model, runtime)
+            native_files_folder, model, runtime, member)
         self.domain = domains[domain]
         self.variables = variables
         self.cache_folder = cache_folder
@@ -86,10 +90,10 @@ class AromeCacheManager:
         self.opened_files = {}
 
     def get_cache_path(self, date, term):
-        return "%s.nc" % (os.path.join(
+        return os.path.join(
             self.cache_folder,
-            self.extractor.get_file_hash(date, term)
-        ),)
+            self.extractor.get_file_hash(date, term, fmt='nc', member=self.extractor.member)
+        )
 
     def extract_subgrid(self, field):
         """Extract pixels of an Epygram field corresponding to a user defined domain"""
@@ -116,8 +120,8 @@ class AromeCacheManager:
         try:
             print("\ndebug")
             print("first try")
-            print(variable)
-            field = input_resource.readfield(variable)
+            print(variable.name)
+            field = input_resource.readfield(variable.name)
             return field
         except AssertionError:
             # todo adapt this part to grib
@@ -159,13 +163,17 @@ class AromeCacheManager:
                     f"We couldn't read {initial_name}")
 
     @staticmethod
-    def pass_metadata_to_netcdf(field):
+    def pass_metadata_to_netcdf(field, outname=None):
         """Pass metadata from fa file to netcdf file"""
-        try:
-            field.fid['netCDF'] = field.fid['FA']
-        except KeyError:
-            field.fid['netCDF'] = field.fid['GRIB2']['shortName']
-        return field
+        if outname:
+            field.fid['netCDF'] = outname
+            return field
+        else:
+            try:
+                field.fid['netCDF'] = field.fid['FA']
+            except KeyError:
+                field.fid['netCDF'] = field.fid['GRIB2']['shortName']
+            return field
 
     def put_in_cache(self, date, term):
         """
@@ -179,7 +187,7 @@ class AromeCacheManager:
         input_resource = epygram.formats.resource(
             native_file_path,
             'r',
-            fmt='FA')
+            fmt=self.extractor.fmt.upper())
         cache_path = self.get_cache_path(date, term)
         if os.path.isfile(cache_path):
             return
@@ -191,7 +199,7 @@ class AromeCacheManager:
             N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
         for variable in self.variables:
             field = self.read_field_or_alternate_name(input_resource, variable)
-            field = self.pass_metadata_to_netcdf(field)
+            field = self.pass_metadata_to_netcdf(field, variable.outname)
             if field.spectral:
                 field.sp2gp()
             field = self.extract_subgrid(field)
@@ -203,6 +211,7 @@ class AromeCacheManager:
 
     def open_file_as_dataset(self, date, term):
         filepath = self.get_cache_path(date, term)
+        # print(filepath)
         dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
         if filepath not in self.opened_files:
             self.opened_files[filepath] = dict(
@@ -222,7 +231,7 @@ class AromeCacheManager:
         file = self.open_file_as_dataset(date, term)
         dataset = xr.Dataset(
             {
-                variable: file['dataset'][variable],
+                variable: file['dataset'][variable.outname],
                 'time': datetime.combine(date, self.runtime) + timedelta(hours=term)
             }
         )

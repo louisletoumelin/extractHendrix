@@ -25,10 +25,10 @@ for term in range(0, 25):
     resource_description = dict(
             **model_description,
             local=os.path.join(
-                '/home/merzisenh/NO_SAVE/AROME/',
+                '/home/radanovicss/NO_SAVE/AROME/',
                 get_filename('AROME', analysis_time, term)
                 ),
-            date= analysis_time, term=term)
+            date=analysis_time, term=term)
     resource = usevortex.get_resources(getmode='epygram', **resource_description)
 
 

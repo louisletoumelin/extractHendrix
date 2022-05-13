@@ -32,13 +32,15 @@ def model_ini_to_dict(model_name):
     return dict_model
 
 
-def get_model_description(model_name):
+def get_model_description(model_name, member=None):
     """Get vortex description of a model"""
 
     dict_model = model_ini_to_dict(model_name)
 
     for key in dict_model.keys():
         dict_model[key] = dict_model[key].split(',')
+    if member:
+        dict_model['member'] = [member]
 
     keys, values = zip(*dict_model.items())
     list_dict_models = [dict(zip(keys, v)) for v in itertools.product(*values)]
@@ -47,16 +49,16 @@ def get_model_description(model_name):
 
 
 class HendrixFileReader:
-    def file_in_cache_path(self, date, term):
+    def file_in_cache_path(self, date, term, fmt='FA', member=None):
         return os.path.join(
             self.cache_folder,
-            self.get_file_hash(date, term)
+            self.get_file_hash(date, term, fmt, member)
         )
 
-    def native_file_path(self, date, term):
+    def native_file_path(self, date, term, fmt='FA', member=None):
         return os.path.join(
             self.native_files_folder,
-            self.get_file_hash(date, term)
+            self.get_file_hash(date, term, fmt, member)
         )
 
 
@@ -279,20 +281,30 @@ class VortexWitchCraftReader(S2MTaskMixIn):
 
 
 class AromeHendrixReader(HendrixFileReader):
-    def __init__(self, native_files_folder=None, model=None, runtime=None):
+    def __init__(self, native_files_folder=None, model=None, runtime=None, member=None):
         self.native_files_folder = native_files_folder
         self.runtime = runtime
         self.model_name = model
+        self.member = member
         # ce dernier attribut est une liste, contenant les valeurs possibles des paramètres pour un même modèle (elles peuvent changer!!!)
         self.model_description_and_alternative_parameters = get_model_description(
-            model)
+            model, member)
+        self.fmt = self.model_description_and_alternative_parameters[0]['nativefmt']
+        # print(self.model_description_and_alternative_parameters)
 
-    def get_file_hash(self, date, term):
-        hash = "%s-run:%sT%s:00:00Z-term:%sh.FA" % (
-            self.model_name,
-            date.strftime("%Y%m%d"),
-            self.runtime.strftime("%H"),
-            term)
+    def get_file_hash(self, date, term, fmt='FA', member=None):
+        if member:
+            hash = "{0}-run_{1}T{2}-00-00Z-term_{3}h_mb{member:03d}.{4}".format(
+                self.model_name,
+                date.strftime("%Y%m%d"),
+                self.runtime.strftime("%H"),
+                term, fmt, member=member)
+        else:
+            hash = "{0}-run_{1}T{2}-00-00Z-term_{3}h.{4}".format(
+                self.model_name,
+                date.strftime("%Y%m%d"),
+                self.runtime.strftime("%H"),
+                term, fmt)
         return hash
 
     def _get_vortex_params(self, date, term):
@@ -304,15 +316,20 @@ class AromeHendrixReader(HendrixFileReader):
         if self.native_files_folder is None:
             return params
         for param in params:
-            param['local'] = os.path.join(
-                self.native_files_folder,
-                self.get_file_hash(date, term))
+            if 'member' in param.keys():
+                param['local'] = os.path.join(
+                    self.native_files_folder,
+                    self.get_file_hash(date, term, param['nativefmt'], param['member']))
+            else:
+                param['local'] = os.path.join(
+                    self.native_files_folder,
+                    self.get_file_hash(date, term, param['nativefmt']))
         return params
 
     def get_native_file(self, date, term):
         """
         """
-        filepath = self.native_file_path(date, term)
+        filepath = self.native_file_path(date, term, self.fmt, self.member)
         # on vérifie s'il n'existe pas déjà
         if os.path.isfile(filepath):
             return filepath
