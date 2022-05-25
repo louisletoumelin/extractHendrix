@@ -3,7 +3,9 @@ from .utils import NativeVariable
 
 model = "PEAROME"
 
-vars = {'t2m': dict(name='2 metre temperature', shortName='2t', parameterCategory=0, parameterNumber=0,
+vars = {'zs': dict(name='Geometrical height', shortName='h', parameterCategory=3, parameterNumber=6,
+                   typeOfFirstFixedSurface=1, level=0, productDefinitionTemplateNumber=1),
+        't2m': dict(name='2 metre temperature', shortName='2t', parameterCategory=0, parameterNumber=0,
                     typeOfFirstFixedSurface=103, level=2, productDefinitionTemplateNumber=1),
         't0m': dict(name='Temperature', shortName='t', parameterCategory=0, parameterNumber=0,
                     typeOfFirstFixedSurface=1, level=0, productDefinitionTemplateNumber=1),

@@ -29,12 +29,15 @@ class ConfigReader:
 
     def dateiterator(self):
         current_date = self.date_start
+        same_date = True
         while current_date <= self.date_end:
             current_term = self.start_term
             while current_term <= self.end_term:
-                yield (current_date, current_term)
+                yield (current_date, current_term, same_date)
                 current_term += self.delta_terms
+                same_date = True
             current_date += timedelta(days=1)
+            same_date = False
 
     def sort_variables_by_model(self):
         """
@@ -116,7 +119,7 @@ def apply_config_user(config_user):
         cache_managers = configReader.cache_managers.values()
     # print(cache_managers)
     for cache_manager in cache_managers:
-        for date_, term in configReader.dateiterator():
+        for date_, term, same_date in configReader.dateiterator():
             retry_and_finally_raise(
                 cache_manager.put_in_cache,
                 configReader,
@@ -127,28 +130,49 @@ def apply_config_user(config_user):
             imember = member-1
             variables_storage = defaultdict(lambda: [])
             #for model_name, variables in configReader.sort_variables_by_model().items():
-            for variables in configReader.config_user['variables_nc']:
-                for date_, term in configReader.dateiterator():
+            for date_, term, same_date in configReader.dateiterator():
+                if configReader.concat_mode == "forecast" and not same_date:
+                    final_dataset = xr.Dataset(
+                        {
+                            variable_name: xr.concat(variable_data, 'time')
+                            for variable_name, variable_data in variables_storage.items()
+                        }
+                    )
+                    date = date_ - timedelta(days=1)
+                    final_dataset.to_netcdf(os.path.join(configReader.folder,
+                                                         "monextraction_{date}T{hour:02d}_mb{member:03d}.nc".format(member=member,
+                                                                                                         date=date.strftime("%Y%m%d"),
+                                                                                                         hour=configReader.analysis_hour)))
+                    variables_storage = defaultdict(lambda: [])
+                for variables in configReader.config_user['variables_nc']:
                     # need to loop over final variables rather than native variables, isn't it ?
-                    for variable in variables.native_vars:
-                        variables_storage[variables.outname].append(
-                            compute_final_variable(
-                                configReader.cache_managers[imember][variable.model_name].read_cache,
-                                date_,
-                                term, variables)
-                        )
+                    #for variable in variables.native_vars:
+                    variables_storage[variables.outname].append(
+                        compute_final_variable(
+                            configReader.cache_managers[imember][variables.native_vars[0].model_name].read_cache,
+                            date_,
+                            term, variables)
+                    )
+                    if variables.units:
+                        variables_storage[variables.outname][0].attrs['units'] = variables.units
+                    if variables.original_long_name:
+                        variables_storage[variables.outname][0].attrs['long_name'] = variables.original_long_name
+            # print(variables_storage.items())
             final_dataset = xr.Dataset(
                 {
                     variable_name: xr.concat(variable_data, 'time')
                     for variable_name, variable_data in variables_storage.items()
                 }
             )
+            date = date_
             final_dataset.to_netcdf(os.path.join(
-                configReader.folder, "monextraction_mb{member:03d}.nc".format(member=member)))
+                configReader.folder, "monextraction_{date}T{hour:02d}_mb{member:03d}.nc".format(member=member,
+                                                                                                date=date.strftime("%Y%m%d"),
+                                                                                                hour=configReader.analysis_hour)))
     else:
         variables_storage = defaultdict(lambda: [])
         for model_name, variables in configReader.sort_variables_by_model().items():
-            for date_, term in configReader.dateiterator():
+            for date_, term, same_date in configReader.dateiterator():
                 for variable in variables:
                     variables_storage[variable.outname].append(
                         compute_final_variable(
