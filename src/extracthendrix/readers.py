@@ -290,22 +290,17 @@ class AromeHendrixReader(HendrixFileReader):
         self.model_description_and_alternative_parameters = get_model_description(
             model, member)
         self.fmt = self.model_description_and_alternative_parameters[0]['nativefmt']
-        # print(self.model_description_and_alternative_parameters)
 
-    def get_file_hash(self, date, term, fmt='FA', member=None):
-        if member:
-            hash = "{0}-run_{1}T{2}-00-00Z-term_{3}h_mb{member:03d}.{4}".format(
-                self.model_name,
-                date.strftime("%Y%m%d"),
-                self.runtime.strftime("%H"),
-                term, fmt, member=member)
-        else:
-            hash = "{0}-run_{1}T{2}-00-00Z-term_{3}h.{4}".format(
-                self.model_name,
-                date.strftime("%Y%m%d"),
-                self.runtime.strftime("%H"),
-                term, fmt)
-        return hash
+    def get_file_hash(self, date, term):
+        hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}.{fmt}".format(
+            model = self.model_name,
+            date = date.strftime("%Y%m%d"),
+            runtime = self.runtime.strftime("%H"),
+            term = term,
+            memberstr= "_mb{member:03d}".format(self.member) if self.member else "",
+            fmt = self.fmt
+            )
+        return hash_
 
     def _get_vortex_params(self, date, term):
         params = [dict(
@@ -316,14 +311,9 @@ class AromeHendrixReader(HendrixFileReader):
         if self.native_files_folder is None:
             return params
         for param in params:
-            if 'member' in param.keys():
-                param['local'] = os.path.join(
-                    self.native_files_folder,
-                    self.get_file_hash(date, term, param['nativefmt'], param['member']))
-            else:
-                param['local'] = os.path.join(
-                    self.native_files_folder,
-                    self.get_file_hash(date, term, param['nativefmt']))
+            param['local'] = os.path.join(
+                self.native_files_folder,
+                self.get_file_hash(date, term))
         return params
 
     def get_native_file(self, date, term):
