@@ -77,8 +77,11 @@ class AromeCacheManager:
     """
 
     """
-    def __init__(self, domain=None, variables=[], native_files_folder=None, cache_folder=None, model=None,
-                 runtime=None, delete_native=True, member=None):
+
+    def __init__(
+            self,
+            domain=None, variables=[], native_files_folder=None, cache_folder=None,
+            model=None, runtime=None, delete_native=True, member=None):
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(
@@ -92,7 +95,7 @@ class AromeCacheManager:
     def get_cache_path(self, date, term):
         return os.path.join(
             self.cache_folder,
-            self.extractor.get_file_hash(date, term, fmt='nc', member=self.extractor.member)
+            self.extractor.get_file_hash(date, term)
         )
 
     def extract_subgrid(self, field):
@@ -118,29 +121,15 @@ class AromeCacheManager:
         initial_name = variable
 
         try:
-            print("\ndebug")
-            print("first try")
-            print(variable.name)
             field = input_resource.readfield(variable.name)
             return field
         except AssertionError:
-            # todo adapt this part to grib
-            print("\ndebug")
-            print("Assertion error for variable")
-            print(variable)
-
             if variable in alternatives_names_fa:
                 alternatives_names = copy.deepcopy(
                     alternatives_names_fa[variable])
-                print("\n\ndebug alternatives_names")
-                print(alternatives_names)
-
                 while alternatives_names:
                     try:
                         variable = alternatives_names.pop(0)
-                        print("\ndebug")
-                        print("try with variable")
-                        print(variable)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
                         logger.warning(
@@ -152,9 +141,6 @@ class AromeCacheManager:
                         pass
                 logger.error(
                     f"We coulnd't find correct alternative names for {initial_name}\n\n")
-                print("\ndebug")
-                print("listfields")
-                print(input_resource.listfields())
                 raise CanNotReadEpygramField(
                     f"We couldn't find correct alternative names for {initial_name}")
             else:
@@ -182,7 +168,6 @@ class AromeCacheManager:
         :param term: forecast leadtime
         :type term: int
         """
-
         native_file_path = self.extractor.get_native_file(date, term)
         input_resource = epygram.formats.resource(
             native_file_path,

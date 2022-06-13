@@ -49,16 +49,16 @@ def get_model_description(model_name, member=None):
 
 
 class HendrixFileReader:
-    def file_in_cache_path(self, date, term, fmt='FA', member=None):
+    def file_in_cache_path(self, date, term):
         return os.path.join(
             self.cache_folder,
-            self.get_file_hash(date, term, fmt, member)
+            self.get_file_hash(date, term)
         )
 
-    def native_file_path(self, date, term, fmt='FA', member=None):
+    def native_file_path(self, date, term):
         return os.path.join(
             self.native_files_folder,
-            self.get_file_hash(date, term, fmt, member)
+            self.get_file_hash(date, term)
         )
 
 
@@ -231,17 +231,6 @@ class S2MHendrixReader(HendrixFileReader):
         witch.get_netcdf()
         return filepath
 
-    def push_to_cache(self, date, term, variables):
-        """Simplissime pour l'instant on fait le choix de recopier les netcdf issus de la chaîne en entier
-        variables servira dans un premier temps pour les fichiers AROME, ensuite on
-        pourra proposer de la sous-extraction sur les fichiers S2M également
-        """
-        filename = self.get_file_hash(date, term)
-        shutil.copyfile(
-            self.native_file_path(filename),
-            self.file_in_cache_path(filename)
-        )
-
     def read_cache(self, date, term, variable_name):
         """FIXME: on a en gros l'idée de la lecture, homogéneïser avec les fonctions 
         équivalentes pour les fichiers AROME et ARPEGE quand on aura mis le nez
@@ -297,7 +286,7 @@ class AromeHendrixReader(HendrixFileReader):
             date = date.strftime("%Y%m%d"),
             runtime = self.runtime.strftime("%H"),
             term = term,
-            memberstr= "_mb{member:03d}".format(self.member) if self.member else "",
+            memberstr= "_mb{member:03d}".format(member = self.member) if self.member else "",
             fmt = self.fmt
             )
         return hash_
@@ -319,7 +308,7 @@ class AromeHendrixReader(HendrixFileReader):
     def get_native_file(self, date, term):
         """
         """
-        filepath = self.native_file_path(date, term, self.fmt, self.member)
+        filepath = self.native_file_path(date, term)
         # on vérifie s'il n'existe pas déjà
         if os.path.isfile(filepath):
             return filepath
