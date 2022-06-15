@@ -19,21 +19,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-# large extrait des variables S2M profils à donner en argument aux différentes fonctions
-# de lecture ci-dessous
-variables_S2M_PRO = [
-    'ZS', 'aspect', 'slope', 'massif_num', 'longitude', 'latitude',
-    'time', 'TG1', 'TG4', 'WG1', 'WGI1', 'WSN_VEG', 'RSN_VEG', 'ASN_VEG',
-    'NAT_LEV', 'AVA_TYP', 'TALB_ISBA', 'RN_ISBA', 'H_ISBA', 'LE_ISBA',
-    'GFLUX_ISBA', 'EVAP_ISBA', 'SWD_ISBA', 'SWU_ISBA', 'LWD_ISBA', 'LWU_ISBA',
-    'DRAIN_ISBA', 'RUNOFF_ISBA', 'SNOMLT_ISBA', 'RAINF_ISBA', 'TS_ISBA',
-    'WSN_T_ISBA', 'DSN_T_ISBA', 'SD_1DY_ISBA', 'SD_3DY_ISBA', 'SD_5DY_ISBA',
-    'SD_7DY_ISBA', 'SWE_1DY_ISBA', 'SWE_3DY_ISBA', 'SWE_5DY_ISBA', 'SWE_7DY_ISBA',
-    'RAMSOND_ISBA', 'WET_TH_ISBA', 'REFRZTH_ISBA', 'DEP_HIG', 'DEP_MOD',
-    'ACC_LEV', 'SYTFLX_ISBA', 'SNOWLIQ', 'SNOWTEMP', 'SNOWDZ', 'SNOWDEND',
-    'SNOWSPHER', 'SNOWSIZE', 'SNOWSSA', 'SNOWTYPE', 'SNOWRAM', 'SNOWSHEAR',
-    'ACC_RAT', 'NAT_RAT', 'massif', 'naturalIndex'
-]
+class FolderLayout:
+    def __init__(self, cache_folder=None, native_files_folder=None, computed_vars_folder=None):
+        self.cache_folder = cache_folder
+        self.native_files_folder = native_files_folder
+        self.computed_vars_folder = computed_vars_folder
 
 
 def retry_and_finally_raise(cache_method, configReader, time_retries):
@@ -75,7 +65,6 @@ def retry_and_finally_raise(cache_method, configReader, time_retries):
 
 class AromeCacheManager:
     """
-
     """
 
     def __init__(
@@ -95,7 +84,7 @@ class AromeCacheManager:
     def get_cache_path(self, date, term):
         return os.path.join(
             self.cache_folder,
-            self.extractor.get_file_hash(date, term)
+            '.'.join([self.extractor.get_file_hash(date, term), 'nc'])
         )
 
     def extract_subgrid(self, field):
@@ -167,6 +156,8 @@ class AromeCacheManager:
 
         :param term: forecast leadtime
         :type term: int
+        # TODO: would be nice if hendrix reader could return each variable in a fixed format,
+        this way the cache manager wouldn't depend on the file's format
         """
         native_file_path = self.extractor.get_native_file(date, term)
         input_resource = epygram.formats.resource(
@@ -196,13 +187,9 @@ class AromeCacheManager:
 
     def open_file_as_dataset(self, date, term):
         filepath = self.get_cache_path(date, term)
-        # print(filepath)
-        dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
         if filepath not in self.opened_files:
-            self.opened_files[filepath] = dict(
-                dataset=dataset,
-                variables_read={variable: False for variable in self.variables}
-            )
+            dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
+            self.opened_files[filepath] = dataset
         return self.opened_files[filepath]
 
     def close_file(self, date, term):
@@ -211,22 +198,103 @@ class AromeCacheManager:
         file['dataset'].close()
         del self.opened_files[filepath]
 
-    @contextmanager
-    def read_cache_and_manage_opened_files(self, date, term, variable):
-        file = self.open_file_as_dataset(date, term)
-        dataset = xr.Dataset(
-            {
-                variable: file['dataset'][variable.outname],
-                'time': datetime.combine(date, self.runtime) + timedelta(hours=term)
-            }
-        )
-        yield dataset.set_coords(['time'])[variable]
-        variables_read = file['variables_read']
-        variables_read[variable] = True
-        if all(variables_read.values()):
-            self.close_file(date, term)
-
     def read_cache(self, date, term, variable):
-        with self.read_cache_and_manage_opened_files(date, term, variable) as array:
-            returned_array = array
-        return returned_array
+        cache_path = self.get_cache_path(date, term)
+        if not os.path.isfile(cache_path):
+            self.put_in_cache(date, term)
+        dataset = self.open_file_as_dataset(date, term)
+        return dataset[variable.outname]
+
+
+def get_model_names(computed_vars):
+    return {ivar.model_name for var in computed_vars for ivar in var.native_vars}
+
+def sort_native_vars_by_model(computed_vars):
+    """
+    get all native variables sorted by model
+    :return: a dict with keys=model names and values a list of variables to get from that model.
+    Depending on the file format that might be strings with FA names or dicts with grib keys.
+    :rtype: dict
+    """
+    model_names = get_model_names(computed_vars)
+    return {
+            model_name: [
+                native_var 
+                for computed_var in computed_vars 
+                for native_var in computed_var.native_vars 
+                if native_var.model_name==model_name
+                ]
+            for model_name in model_names
+            }
+
+
+class ComputedValues:
+    """
+    attribue un nom à chaque fichier de valeurs calculées
+    lit et concatène les fichiers sur une plage de temps - sous forme date, echeance - donnée en argument
+    """
+
+    def __init__(self, folderLayout=None, delete_native=True, domain=None, computed_vars=[], analysis_hour=None, members=[None]):
+        self.computed_vars = computed_vars
+        self.members = members
+        self.domain = domain
+        self.delete_native = delete_native
+        self.models = get_model_names(computed_vars)
+        self.native_vars_by_model = sort_native_vars_by_model(computed_vars)
+        self.analysis_hour = analysis_hour
+        self.computed_vars_folder = folderLayout.computed_vars_folder
+        self.cache_managers = self._cache_managers(folderLayout)
+
+    def _cache_managers(self,folderLayout):
+            return {
+                    (model_name, member): AromeCacheManager(
+                        domain=self.domain,
+                        variables=native_vars,
+                        native_files_folder=folderLayout.native_files_folder,
+                        cache_folder=folderLayout.cache_folder,
+                        model=model_name,
+                        runtime=time(hour=self.analysis_hour),
+                        delete_native=self.delete_native,
+                        member=member
+                        ) 
+                    for model_name, native_vars in sort_native_vars_by_model(computed_vars).items()
+                    for member in self.members
+                    }
+
+
+    def get_file_hash(self, date, term, member):
+        hash_ = "run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}.nc".format(
+            date=date.strftime("%Y%m%d"),
+            runtime=self.analysis_hour,
+            term=term,
+            memberstr="_mb{member:03d}".format(member=member) if member else ""
+        )
+        return hash_
+
+    def get_filepath(self, date, term, member):
+        return os.path.join(
+                self.computed_vars_folder,
+                self.get_file_hash(date, term, member)
+                )
+
+
+    def compute(self,date, term):
+        for member in self.members:
+            variables_storage = defaultdict(lambda: [])
+            for computed_var in self.computed_vars:
+                model_name = computed_var.native_vars[0].model_name
+                computed_values = computed_var.compute(
+                        self.cache_managers[(model_name, member)].read_cache,
+                        date,
+                        term,
+                        *computed_var.native_vars
+                        )
+                variables_storage[computed_var.name] = computed_values
+            final_dataset = xr.Dataset(
+                {
+                    variable_name: variable_data
+                    for variable_name, variable_data in variables_storage.items()
+                }
+            )
+            final_dataset.to_netcdf(self.get_filepath(date, term, member))
+
