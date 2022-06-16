@@ -58,7 +58,7 @@ class HendrixFileReader:
     def native_file_path(self, date, term):
         return os.path.join(
             self.native_files_folder,
-            self.get_file_hash(date, term)
+            '.'.join([self.get_file_hash(date, term), self.fmt])
         )
 
 
@@ -281,14 +281,14 @@ class AromeHendrixReader(HendrixFileReader):
         self.fmt = self.model_description_and_alternative_parameters[0]['nativefmt']
 
     def get_file_hash(self, date, term):
-        hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}.{fmt}".format(
-            model = self.model_name,
-            date = date.strftime("%Y%m%d"),
-            runtime = self.runtime.strftime("%H"),
-            term = term,
-            memberstr= "_mb{member:03d}".format(member = self.member) if self.member else "",
-            fmt = self.fmt
-            )
+        hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}".format(
+            model=self.model_name,
+            date=date.strftime("%Y%m%d"),
+            runtime=self.runtime.strftime("%H"),
+            term=term,
+            memberstr="_mb{member:03d}".format(
+                member=self.member) if self.member else ""
+        )
         return hash_
 
     def _get_vortex_params(self, date, term):
@@ -300,9 +300,7 @@ class AromeHendrixReader(HendrixFileReader):
         if self.native_files_folder is None:
             return params
         for param in params:
-            param['local'] = os.path.join(
-                self.native_files_folder,
-                self.get_file_hash(date, term))
+            param['local'] = os.path.join(self.native_file_path(date, term))
         return params
 
     def get_native_file(self, date, term):

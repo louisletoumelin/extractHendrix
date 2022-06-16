@@ -2,8 +2,9 @@ import os
 import copy
 import logging
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import time, datetime, timedelta
 import time as timeutils
+from collections import defaultdict
 
 import numpy as np
 import epygram
@@ -20,10 +21,11 @@ logger.setLevel(logging.DEBUG)
 
 
 class FolderLayout:
-    def __init__(self, cache_folder=None, native_files_folder=None, computed_vars_folder=None):
+    def __init__(self, cache_folder=None, native_files_folder=None, computed_vars_folder=None, final_files_folder=None):
         self.cache_folder = cache_folder
         self.native_files_folder = native_files_folder
         self.computed_vars_folder = computed_vars_folder
+        self.final_files_folder = final_files_folder
 
 
 def retry_and_finally_raise(cache_method, configReader, time_retries):
@@ -209,6 +211,7 @@ class AromeCacheManager:
 def get_model_names(computed_vars):
     return {ivar.model_name for var in computed_vars for ivar in var.native_vars}
 
+
 def sort_native_vars_by_model(computed_vars):
     """
     get all native variables sorted by model
@@ -218,49 +221,87 @@ def sort_native_vars_by_model(computed_vars):
     """
     model_names = get_model_names(computed_vars)
     return {
-            model_name: [
-                native_var 
-                for computed_var in computed_vars 
-                for native_var in computed_var.native_vars 
-                if native_var.model_name==model_name
-                ]
-            for model_name in model_names
-            }
+        model_name: [
+            native_var
+            for computed_var in computed_vars
+            for native_var in computed_var.native_vars
+            if native_var.model_name == model_name
+        ]
+        for model_name in model_names
+    }
+
+
+def validity_date(runtime, date_, term):
+    return datetime.combine(date_, time(hour=runtime)) + timedelta(hours=term)
+
+
+def dateiterator(date_start, date_end, first_term, last_term, delta_terms):
+    current_date = date_start
+    while current_date <= date_end:
+        current_term = first_term
+        while current_term <= last_term:
+            yield (current_date, current_term)
+            current_term += delta_terms
+        current_date += timedelta(days=1)
 
 
 class ComputedValues:
     """
-    attribue un nom à chaque fichier de valeurs calculées
-    lit et concatène les fichiers sur une plage de temps - sous forme date, echeance - donnée en argument
+    calcule les valeurs finales pour chaque date_, term
     """
 
-    def __init__(self, folderLayout=None, delete_native=True, domain=None, computed_vars=[], analysis_hour=None, members=[None]):
+    def __init__(self, folderLayout=None, delete_native=True, delete_individuals=True, domain=None, computed_vars=[], analysis_hour=None, members=[None]):
         self.computed_vars = computed_vars
         self.members = members
         self.domain = domain
         self.delete_native = delete_native
+        self.delete_individuals = delete_individuals
         self.models = get_model_names(computed_vars)
         self.native_vars_by_model = sort_native_vars_by_model(computed_vars)
         self.analysis_hour = analysis_hour
         self.computed_vars_folder = folderLayout.computed_vars_folder
-        self.cache_managers = self._cache_managers(folderLayout)
+        self.computed_files = defaultdict(lambda: [])
+        self.folderLayout = folderLayout
+        self.cache_managers = self._cache_managers(folderLayout, computed_vars)
 
-    def _cache_managers(self,folderLayout):
-            return {
-                    (model_name, member): AromeCacheManager(
-                        domain=self.domain,
-                        variables=native_vars,
-                        native_files_folder=folderLayout.native_files_folder,
-                        cache_folder=folderLayout.cache_folder,
-                        model=model_name,
-                        runtime=time(hour=self.analysis_hour),
-                        delete_native=self.delete_native,
-                        member=member
-                        ) 
-                    for model_name, native_vars in sort_native_vars_by_model(computed_vars).items()
-                    for member in self.members
-                    }
+    def _cache_managers(self, folderLayout, computed_vars):
+        return {
+            (model_name, member): AromeCacheManager(
+                domain=self.domain,
+                variables=native_vars,
+                native_files_folder=folderLayout.native_files_folder,
+                cache_folder=folderLayout.cache_folder,
+                model=model_name,
+                runtime=time(hour=self.analysis_hour),
+                delete_native=self.delete_native,
+                member=member
+            )
+            for model_name, native_vars in sort_native_vars_by_model(computed_vars).items()
+            for member in self.members
+        }
 
+    def get_concatenated_filename(self, fileroot, member):
+        hash_ = "final_{fileroot}_run_{runtime}h{memberstr}.nc".format(
+                fileroot=fileroot,
+                runtime=self.analysis_hour,
+                memberstr="_mb{member:03d}".format(
+                    member=member) if member else ""
+        )
+        return os.path.join(
+            self.folderLayout.final_files_folder,
+            hash_
+        )
+
+    def concat_files_and_forget(self, fileroot):
+        for member in self.members:
+            ds = xr.open_mfdataset(
+                self.computed_files[member],
+                concat_dim='time')
+            ds.to_netcdf(self.get_concatenated_filename(fileroot, member))
+            if self.delete_individuals:
+                [os.remove(filename)
+                 for filename in self.computed_files[member]]
+            del self.computed_files[member]
 
     def get_file_hash(self, date, term, member):
         hash_ = "run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}.nc".format(
@@ -273,28 +314,42 @@ class ComputedValues:
 
     def get_filepath(self, date, term, member):
         return os.path.join(
-                self.computed_vars_folder,
-                self.get_file_hash(date, term, member)
-                )
+            self.computed_vars_folder,
+            self.get_file_hash(date, term, member)
+        )
 
-
-    def compute(self,date, term):
+    def compute(self, date, term):
         for member in self.members:
+            if os.path.isfile(self.get_filepath(date, term, member)):
+                self.computed_files[member].append(
+                    self.get_filepath(date, term, member)
+                )
+                continue
             variables_storage = defaultdict(lambda: [])
             for computed_var in self.computed_vars:
                 model_name = computed_var.native_vars[0].model_name
                 computed_values = computed_var.compute(
-                        self.cache_managers[(model_name, member)].read_cache,
-                        date,
-                        term,
-                        *computed_var.native_vars
-                        )
+                    self.cache_managers[(model_name, member)].read_cache,
+                    date,
+                    term,
+                    *computed_var.native_vars
+                )
                 variables_storage[computed_var.name] = computed_values
+            variables_storage['time'] = validity_date(
+                self.analysis_hour, date, term)
             final_dataset = xr.Dataset(
                 {
                     variable_name: variable_data
                     for variable_name, variable_data in variables_storage.items()
                 }
             )
-            final_dataset.to_netcdf(self.get_filepath(date, term, member))
-
+            final_dataset = (
+                final_dataset
+                .expand_dims(dim='time')
+                .set_coords('time')
+            )
+            filepath = self.get_filepath(date, term, member)
+            final_dataset.to_netcdf(filepath)
+            self.computed_files[member].append(
+                self.get_filepath(date, term, member)
+            )
