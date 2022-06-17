@@ -1,27 +1,46 @@
+import epygram
 import pytest
 from extracthendrix.readers import AromeHendrixReader
-from extracthendrix.generic import AromeCacheManager, sort_native_vars_by_model
+from extracthendrix.generic import AromeCacheManager, sort_native_vars_by_model, FolderLayout
 import os
 import shutil
 from datetime import date, time
 from extracthendrix.config.variables import pearome
+import extracthendrix.config.variables.pearome_grib as peg
 
 
 test_folder = '/home/merzisenh/NO_SAVE/extracthendrix/testing'
+test_data_folder = '/home/merzisenh/NO_SAVE/test_data_extracthendrix'
 
-native_files_folder = os.path.join(test_folder, '_native_')
-data_folder = os.path.join(test_folder, 'data', 'pearome')
-cache_folder = os.path.join(test_folder, '_cache_')
+folderLayout = FolderLayout(work_folder=test_folder)
 
-
-def setup_module():
-    os.mkdir(native_files_folder)
-    os.mkdir(cache_folder)
+# TODO: (to keep it easy)
+# test_data contains folders _native_, _cache_ to test CacheManager, ComputedValues, etc...
+# symlink
 
 
-def teardown_module():
-    shutil.rmtree(native_files_folder)
-    shutil.rmtree(cache_folder)
+def symlink_files(test_data_folder, subfolder, type_):
+    """
+    type_: type de dossier de travail de extracthendrix (_native_, _cache_, _computed_, _final-)
+    test_data_folder: le dossier contenant les données pour les tests
+    subfolder: le sous-dossier du précédent contenant les données pour un test
+    Crée un lien symbolique dans les dossi
+    """
+    native_data_loc = os.path.join(test_data_folder, 'pearome', '_native_')
+    list_native_files = os.listdir(native_data_loc)
+    for filename in list_native_files:
+        os.symlink(
+            os.path.join(native_data_loc, filename),
+            os.path.join(test_folder, '_native_', filename)
+        )
+
+
+def setup_function():
+    folderLayout._create_layout()
+
+
+def teardown_function():
+    shutil.rmtree(test_folder)
 
 
 @pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionnally")
@@ -29,28 +48,50 @@ def teardown_module():
 def test_read_pearome(member):
     model = 'PEAROME'
     reader = AromeHendrixReader(
-        native_files_folder, model, time(hour=3), member=member)
+        folderLayout, model, time(hour=3), member=member)
     reader.get_native_file(date(2020, 3, 1), 2)
 
 
-def test_cache_pearome():
+def test_put_in_cache_pearome():
+    symlink_files(test_data_folder, 'cache_pearome', '_native_')
     date_, term = date(2020, 3, 1), 1
     domain = 'alp'
     analysis_hour = 3
-    variables_nc = [pearome.Tair, pearome.Qair,
-                    pearome.Wind, pearome.Wind_DIR, pearome.Psurf]
-    variables = sort_native_vars_by_model(variables_nc)['PEAROME']
+    variables = [
+        peg.t2m, peg.t2m, peg.r2m, peg.pres0m, peg.u10m, peg.v10m,
+        peg.u10m, peg.v10m, peg.pres0m
+    ]
     cache_manager = AromeCacheManager(
         domain=domain,
         variables=variables,
-        native_files_folder=data_folder,
-        cache_folder=cache_folder,
+        folderLayout=folderLayout,
         model='PEAROME',
         runtime=time(hour=analysis_hour),
         delete_native=False,
         member=2
     )
     cache_manager.put_in_cache(date_, term)
-    # expected_name = 'PEAROME-run_20200301T03-00-00Z-term_1h_mb002.grib'
     expected_name = cache_manager.get_cache_path(date_, term)
-    assert os.path.isfile(os.path.join(cache_folder, expected_name))
+    assert os.path.isfile(os.path.join(folderLayout._cache_, expected_name))
+
+
+def test_read_cache_pearome():
+    date_, term = date(2020, 3, 1), 1
+    domain = 'alp'
+    analysis_hour = 3
+    variables = [
+        peg.t2m, peg.t2m, peg.r2m, peg.pres0m, peg.u10m, peg.v10m,
+        peg.u10m, peg.v10m, peg.pres0m
+    ]
+    cache_manager = AromeCacheManager(
+        domain=domain,
+        variables=variables,
+        folderLayout=folderLayout,
+        model='PEAROME',
+        runtime=time(hour=analysis_hour),
+        delete_native=False,
+        member=2
+    )
+    t2m = cache_manager.read_cache(date_, term, peg.t2m)
+    # persistency test: this value must remain the same when we update the code
+    assert t2m.isel(xx=50, yy=50).item() == 271.1785136721989
