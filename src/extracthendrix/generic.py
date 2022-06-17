@@ -21,11 +21,23 @@ logger.setLevel(logging.DEBUG)
 
 
 class FolderLayout:
-    def __init__(self, cache_folder=None, native_files_folder=None, computed_vars_folder=None, final_files_folder=None):
-        self.cache_folder = cache_folder
-        self.native_files_folder = native_files_folder
-        self.computed_vars_folder = computed_vars_folder
-        self.final_files_folder = final_files_folder
+
+    def __init__(self, work_folder):
+        self.work_folder = work_folder
+        self._create_layout()
+
+    def _create_layout(self):
+        try:
+            os.mkdir(self.work_folder)
+        except FileExistsError:
+            print("Folder {folder} already exists".format(
+                folder=self.work_folder))
+        for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
+            setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
+            try:
+                os.mkdir(getattr(self, subfolder))
+            except FileExistsError:
+                print("Subfolder {subfolder} has already been created")
 
 
 def retry_and_finally_raise(cache_method, configReader, time_retries):
@@ -71,21 +83,22 @@ class AromeCacheManager:
 
     def __init__(
             self,
-            domain=None, variables=[], native_files_folder=None, cache_folder=None,
+            folderLayout,
+            domain=None, variables=[],
             model=None, runtime=None, delete_native=True, member=None):
+        self.folderLayout = folderLayout
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(
-            native_files_folder, model, runtime, member)
+            folderLayout, model, runtime, member)
         self.domain = domains[domain]
         self.variables = variables
-        self.cache_folder = cache_folder
         self.runtime = runtime
         self.opened_files = {}
 
     def get_cache_path(self, date, term):
         return os.path.join(
-            self.cache_folder,
+            self.folderLayout._cache_,
             '.'.join([self.extractor.get_file_hash(date, term), 'nc'])
         )
 
@@ -259,7 +272,6 @@ class ComputedValues:
         self.models = get_model_names(computed_vars)
         self.native_vars_by_model = sort_native_vars_by_model(computed_vars)
         self.analysis_hour = analysis_hour
-        self.computed_vars_folder = folderLayout.computed_vars_folder
         self.computed_files = defaultdict(lambda: [])
         self.folderLayout = folderLayout
         self.cache_managers = self._cache_managers(folderLayout, computed_vars)
@@ -267,10 +279,9 @@ class ComputedValues:
     def _cache_managers(self, folderLayout, computed_vars):
         return {
             (model_name, member): AromeCacheManager(
+                folderLayout=folderLayout,
                 domain=self.domain,
                 variables=native_vars,
-                native_files_folder=folderLayout.native_files_folder,
-                cache_folder=folderLayout.cache_folder,
                 model=model_name,
                 runtime=time(hour=self.analysis_hour),
                 delete_native=self.delete_native,
@@ -288,7 +299,7 @@ class ComputedValues:
                     member=member) if member else ""
         )
         return os.path.join(
-            self.folderLayout.final_files_folder,
+            self.folderLayout._final_,
             hash_
         )
 
@@ -314,7 +325,7 @@ class ComputedValues:
 
     def get_filepath(self, date, term, member):
         return os.path.join(
-            self.computed_vars_folder,
+            self.folderLayout._computed_,
             self.get_file_hash(date, term, member)
         )
 

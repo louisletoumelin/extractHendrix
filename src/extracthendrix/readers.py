@@ -51,13 +51,13 @@ def get_model_description(model_name, member=None):
 class HendrixFileReader:
     def file_in_cache_path(self, date, term):
         return os.path.join(
-            self.cache_folder,
+            self.folderLayout._cache_,
             self.get_file_hash(date, term)
         )
 
     def native_file_path(self, date, term):
         return os.path.join(
-            self.native_files_folder,
+            self.folderLayout._native_,
             '.'.join([self.get_file_hash(date, term), self.fmt])
         )
 
@@ -270,8 +270,8 @@ class VortexWitchCraftReader(S2MTaskMixIn):
 
 
 class AromeHendrixReader(HendrixFileReader):
-    def __init__(self, native_files_folder=None, model=None, runtime=None, member=None):
-        self.native_files_folder = native_files_folder
+    def __init__(self, folderLayout=None, model=None, runtime=None, member=None):
+        self.folderLayout = folderLayout
         self.runtime = runtime
         self.model_name = model
         self.member = member
@@ -297,8 +297,6 @@ class AromeHendrixReader(HendrixFileReader):
             date=datetime.combine(date=date, time=self.runtime),
             term=term
         ) for model_description in self.model_description_and_alternative_parameters]
-        if self.native_files_folder is None:
-            return params
         for param in params:
             param['local'] = os.path.join(self.native_file_path(date, term))
         return params

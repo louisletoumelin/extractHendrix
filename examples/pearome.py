@@ -3,16 +3,7 @@ import extracthendrix.config.variables.pearome as pear
 from datetime import date
 
 
-native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
-cache_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_cache_"
-computed_vars_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_computed_"
-final_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_final_"
-
-layout = FolderLayout(native_files_folder=native_files_folder,
-                      cache_folder=cache_folder,
-                      computed_vars_folder=computed_vars_folder,
-                      final_files_folder=final_files_folder
-                      )
+layout = FolderLayout(work_folder='/home/merzisenh/NO_SAVE/extracthendrix')
 
 computed_vars = [pear.Wind, pear.Wind_DIR]
 
