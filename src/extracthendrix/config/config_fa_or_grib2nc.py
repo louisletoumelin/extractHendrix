@@ -188,7 +188,7 @@ transformations = {
                          details_original_field="Cum. net IR flux at surface"),
 
                'clear_sky_LWnet':
-                    dict(fa_fields_required=['SnnnRAYT THER CL'],
+                    dict(fa_fields_required=['SRAYT THER CL'],
                          grib_fields_required=[dict()],
                          is_surface_variable=[False],
                          compute=None,
@@ -237,7 +237,7 @@ transformations = {
                          details_original_field="Cum. Downward solarflux at surface"),
 
                'clear_sky_SWnet':
-                    dict(fa_fields_required=['SnnnRAYT SOL CL'],
+                    dict(fa_fields_required=['SRAYT SOL CL'],
                          grib_fields_required=[dict()],
                          is_surface_variable=[False],
                          compute=None,

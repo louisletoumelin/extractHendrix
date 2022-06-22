@@ -6,6 +6,8 @@ import shutil
 import copy
 import configparser
 import pkg_resources
+import functools
+import time as timeutils
 
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
@@ -20,6 +22,45 @@ from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMat
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+def retry_and_finally_raise(onRetry, onFailure, time_retries):
+    """
+    Args:
+    cache_method (:obj:`method`): La méthode à exécuter
+    config_user (:obj:`extractHendrix.configreader.ConfigReader`): la configuration de l'utilisateur
+    time_retries (:obj:`list` of :obj:`datetime.timedelta`): les intervalles de temps au bout desquels relancer la fonction en cas d'échec
+    """
+    def decorator_retry(func):
+        @functools.wraps(func)
+        def wrapper_retry(*args):
+            if len(time_retries) == 0:
+                return func(*args)
+            for numretry, delta in enumerate(time_retries):
+                try:
+                    return func(*args)
+                except Exception as E:
+                    onRetry(E, timeutils.asctime(), numretry+1, delta)
+                    timeutils.sleep(delta.total_seconds())
+            # last attempt before giving up
+            try:
+                return func(*args)
+            except Exception as E:
+                onFailure(E, timeutils.asctime())
+                raise E
+        return wrapper_retry
+    return decorator_retry
+
+
+def onRetryDefault(exception_raised, time_fail, nb_attempts, time_to_next_retry):
+    print(exception_raised, time_fail, nb_attempts, time_to_next_retry)
+
+
+def onFailureDefault(exception_raised, current_time):
+    print(exception_raised, current_time)
+
+
+class NativeFileUnfetchedException(Exception):
+    pass
 
 
 def model_ini_to_dict(model_name):
@@ -270,8 +311,9 @@ class VortexWitchCraftReader(S2MTaskMixIn):
 
 
 class AromeHendrixReader(HendrixFileReader):
-    def __init__(self, folderLayout=None, model=None, runtime=None, member=None):
+    def __init__(self, folderLayout=None, model=None, runtime=None, member=None,getmode='get'):
         self.folderLayout = folderLayout
+        self.getmode=getmode
         self.runtime = runtime
         self.model_name = model
         self.member = member
@@ -297,17 +339,21 @@ class AromeHendrixReader(HendrixFileReader):
             date=datetime.combine(date=date, time=self.runtime),
             term=term
         ) for model_description in self.model_description_and_alternative_parameters]
-        for param in params:
-            param['local'] = os.path.join(self.native_file_path(date, term))
+        if self.getmode == 'get':
+            for param in params:
+                param['local'] = os.path.join(self.native_file_path(date, term))
         return params
 
-    def get_native_file(self, date, term):
+    @retry_and_finally_raise(onRetryDefault, onFailureDefault, [])
+    def get_native_file(self, date, term, autofetch=True):
         """
         """
         filepath = self.native_file_path(date, term)
         # on vérifie s'il n'existe pas déjà
         if os.path.isfile(filepath):
             return filepath
+        if not autofetch:
+            raise NativeFileUnfetchedException()
         last_exception = None
         for param in self._get_vortex_params(date, term):
             # ici au cas ou il y ait plusieurs combinaisons de paramètres vortex

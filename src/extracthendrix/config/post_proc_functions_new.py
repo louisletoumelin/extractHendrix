@@ -2,6 +2,10 @@ import numpy as np
 from bronx.meteo.thermo import Thermo
 
 
+def copy(read_cache, date, term, native_variable):
+    return read_cache(date, term, native_variable)
+
+
 def compute_temperature_in_degree_c(read_cache, date, term, native_variable):
     """
     convert absolute temperature to degrees C.
@@ -12,6 +16,7 @@ def compute_temperature_in_degree_c(read_cache, date, term, native_variable):
     :return: temperature in degrees C
     """
     return read_cache(date, term, native_variable) - 273.15
+
 
 def compute_t_r_p2qv(read_cache, date, term, temperature, rh, pressure):
     """
@@ -32,6 +37,7 @@ def compute_t_r_p2qv(read_cache, date, term, temperature, rh, pressure):
     qv = Thermo.e_P_qliquid_qice2qv(e, p, 0, 0)
     return qv
 
+
 def compute_wind_speed(read_cache, date, term, name_u_component, name_v_component):
     """
     compute wind speed from u component and v component of wind.
@@ -46,6 +52,7 @@ def compute_wind_speed(read_cache, date, term, name_u_component, name_v_componen
     v = read_cache(date, term, name_v_component)
     return np.sqrt(u**2 + v**2)
 
+
 def compute_wind_direction(read_cache, date, term, name_u_component, name_v_component):
     """
     compute wind direction in degrees from u component and v component of wind.
@@ -59,6 +66,7 @@ def compute_wind_direction(read_cache, date, term, name_u_component, name_v_comp
     u = read_cache(date, term, name_u_component)
     v = read_cache(date, term, name_v_component)
     return np.mod(180 + np.rad2deg(np.arctan2(u, v)), 360)
+
 
 def sum_solid_prec(read_cache, date, term, snow, graupel, hail):
     """
@@ -76,6 +84,7 @@ def sum_solid_prec(read_cache, date, term, snow, graupel, hail):
     h = read_cache(date, term, hail)
     return s+g+h
 
+
 def percent2fraction(read_cache, date, term, var):
     """
     convert percent to fraction (value between 0 and 1)
@@ -87,6 +96,7 @@ def percent2fraction(read_cache, date, term, var):
     """
     percent = read_cache(date, term, var)
     return percent/100.
+
 
 def joule2watt_hourly(read_cache, date, term, var):
     """

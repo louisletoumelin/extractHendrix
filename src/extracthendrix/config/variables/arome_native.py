@@ -8,5 +8,5 @@ vars = ['CLSTEMPERATURE', 'S090TEMPERATURE',
 
 module = sys.modules[__name__]
 for name in vars:
-    setattr(module, name.replace('.', '_'),
+    setattr(module, name.replace('.', '__'),
             NativeVariable(model_name=model, name=name))

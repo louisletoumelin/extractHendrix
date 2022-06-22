@@ -1,5 +1,5 @@
 import sys
-from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c, compute_wind_speed
+from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c, compute_wind_speed, copy
 from . import arome_native as an
 from . import arome_surface_native as asn
 from .utils import Variable
@@ -17,11 +17,11 @@ vars = {
          original_long_name="Prognostic lowest level temperature"),
     'ts':
     dict(native_vars=[an.SURFTEMPERATURE],
-         compute=None,
+         compute=copy,
          original_long_name="Surface temperature. Ts (the one used in radiation)"),
     'SWE':
     dict(native_vars=[asn.X001WSN_VEG1],
-         compute=None,
+         compute=copy,
          original_long_name="contenu équivalent en eau de la neige [km m-2]")
 }
 

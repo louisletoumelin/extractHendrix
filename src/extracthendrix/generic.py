@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 import copy
 import logging
@@ -40,41 +41,31 @@ class FolderLayout:
                 print("Subfolder {subfolder} has already been created")
 
 
-def retry_and_finally_raise(cache_method, configReader, time_retries):
-    """
-    Args:
-    cache_method (:obj:`method`): La méthode à exécuter
-    configReader (:obj:`extractHendrix.configreader.ConfigReader`): la configuration de l'utilisateur
-    time_retries (:obj:`list` of :obj:`datetime.timedelta`): les intervalles de temps au bout desquels relancer la fonction en cas d'échec
-    """
-    def cache_method_wrapper(*args):
-        for numretry, delta in enumerate(time_retries):
-            try:
-                return cache_method(*args)
-            except Exception as E:
-                send_problem_extraction_email(
-                    email_adress=configReader.email_adress,
-                    error_message=E,
-                    time_of_problem=timeutils.asctime(),
-                    resource_that_stopped=None,
-                    folder=configReader.folder,
-                    nb_of_try=numretry+1,
-                    time_waiting=str(delta)
-                )
-                timeutils.sleep(delta.total_seconds())
-        # dernier essai avant l'abandon
-        try:
-            return cache_method(*args)
-        except Exception as E:
-            send_script_stopped_email(
-                email_adress=configReader.email_adress,
-                config_user=configReader.config_user,
-                error=E,
-                current_time=timeutils.asctime(),
-                folder=configReader.folder,
-            )
-            raise E
-    return cache_method_wrapper
+def send_problem_extraction_email_with_config(config_user):
+    def mailer(exception_raised, time_fail, nb_attempts, time_to_next_retry):
+        send_problem_extraction_email(
+            email_adress=config_user['email_adress'],
+            error_message=exception_raised,
+            time_of_problem=time_fail,
+            resource_that_stopped=None,
+            folder=config_user['folder'],
+            nb_of_try=nb_attempts+1,
+            time_waiting=str(time_to_next_retry)
+        )
+    return mailer
+
+
+def send_script_stopped_email_with_config(config_user):
+    def mailer(exception_raised, current_time):
+        send_script_stopped_email(
+            email_adress=config_user['email_adress'],
+            config_user=config_user,
+            error=exception_raised,
+            current_time=current_time,
+            folder=config_user.folder,
+        )
+    return mailer
+
 
 
 class AromeCacheManager:
@@ -84,8 +75,14 @@ class AromeCacheManager:
     def __init__(
             self,
             folderLayout,
-            domain=None, variables=[],
-            model=None, runtime=None, delete_native=True, member=None):
+            domain=None,
+            variables=[],
+            model=None,
+            runtime=None,
+            delete_native=True,
+            member=None,
+            autofetch_native=False
+    ):
         self.folderLayout = folderLayout
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
@@ -94,6 +91,7 @@ class AromeCacheManager:
         self.domain = domains[domain]
         self.variables = variables
         self.runtime = runtime
+        self.autofetch_native = autofetch_native
         self.opened_files = {}
 
     def get_cache_path(self, date, term):
@@ -165,6 +163,15 @@ class AromeCacheManager:
                 field.fid['netCDF'] = field.fid['GRIB2']['shortName']
             return field
 
+    def get_native_resource(self, date, term):
+        native_file_path = self.extractor.get_native_file(
+            date, term, autofetch=self.autofetch_native)
+        input_resource = epygram.formats.resource(
+            native_file_path,
+            'r',
+            fmt=self.extractor.fmt.upper())
+        return native_file_path, input_resource
+
     def put_in_cache(self, date, term):
         """
         Builds a single netcdf file corresponding to a single fa or grib file.
@@ -174,11 +181,7 @@ class AromeCacheManager:
         # TODO: would be nice if hendrix reader could return each variable in a fixed format,
         this way the cache manager wouldn't depend on the file's format
         """
-        native_file_path = self.extractor.get_native_file(date, term)
-        input_resource = epygram.formats.resource(
-            native_file_path,
-            'r',
-            fmt=self.extractor.fmt.upper())
+        native_file_path, input_resource = self.get_native_resource(date, term)
         cache_path = self.get_cache_path(date, term)
         if os.path.isfile(cache_path):
             return
@@ -263,7 +266,17 @@ class ComputedValues:
     calcule les valeurs finales pour chaque date_, term
     """
 
-    def __init__(self, folderLayout=None, delete_native=True, delete_individuals=True, domain=None, computed_vars=[], analysis_hour=None, members=[None]):
+    def __init__(
+            self,
+            folderLayout=None,
+            delete_native=True,
+            delete_individuals=True,
+            domain=None,
+            computed_vars=[],
+            analysis_hour=None,
+            autofetch_native=False,
+            members=[None]
+    ):
         self.computed_vars = computed_vars
         self.members = members
         self.domain = domain
@@ -274,9 +287,10 @@ class ComputedValues:
         self.analysis_hour = analysis_hour
         self.computed_files = defaultdict(lambda: [])
         self.folderLayout = folderLayout
-        self.cache_managers = self._cache_managers(folderLayout, computed_vars)
+        self.cache_managers = self._cache_managers(
+            folderLayout, computed_vars, autofetch_native)
 
-    def _cache_managers(self, folderLayout, computed_vars):
+    def _cache_managers(self, folderLayout, computed_vars, autofetch_native):
         return {
             (model_name, member): AromeCacheManager(
                 folderLayout=folderLayout,
@@ -285,6 +299,7 @@ class ComputedValues:
                 model=model_name,
                 runtime=time(hour=self.analysis_hour),
                 delete_native=self.delete_native,
+                autofetch_native=autofetch_native,
                 member=member
             )
             for model_name, native_vars in sort_native_vars_by_model(computed_vars).items()

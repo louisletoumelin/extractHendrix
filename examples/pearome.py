@@ -31,7 +31,6 @@ def shifting_to_next_day(runtime, previous, current):
 
 
 previous = (date_start, first_term)
-computed = {}
 for date_, term in dateiterator(date_start, date_end, first_term, last_term, delta_terms):
     shifting = shifting_to_next_day(runtime, previous, (date_, term))
     if shifting:
