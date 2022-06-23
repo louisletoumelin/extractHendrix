@@ -27,45 +27,25 @@ class FolderLayout:
         self.work_folder = work_folder
         self._create_layout()
 
+    @staticmethod
+    def _create_folder_if_doesnt_exist(path):
+        try:
+            os.mkdir(path)
+        except FileExistsError:
+            print(f"Folder {path} already exists")
+
     def _create_layout(self):
+
         try:
             os.mkdir(self.work_folder)
         except FileExistsError:
-            print("Folder {folder} already exists".format(
-                folder=self.work_folder))
+            print(f"Folder {self.work_folder} already exists")
         for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
             setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
             try:
                 os.mkdir(getattr(self, subfolder))
             except FileExistsError:
-                print("Subfolder {subfolder} has already been created".format(
-                    subfolder=subfolder))
-
-
-def send_problem_extraction_email_with_config(config_user):
-    def mailer(exception_raised, time_fail, nb_attempts, time_to_next_retry):
-        send_problem_extraction_email(
-            email_adress=config_user['email_adress'],
-            error_message=exception_raised,
-            time_of_problem=time_fail,
-            resource_that_stopped=None,
-            folder=config_user['folder'],
-            nb_of_try=nb_attempts+1,
-            time_waiting=str(time_to_next_retry)
-        )
-    return mailer
-
-
-def send_script_stopped_email_with_config(config_user):
-    def mailer(exception_raised, current_time):
-        send_script_stopped_email(
-            email_adress=config_user['email_adress'],
-            config_user=config_user,
-            error=exception_raised,
-            current_time=current_time,
-            folder=config_user.folder,
-        )
-    return mailer
+                print(f"Subfolder {subfolder} has already been created")
 
 
 class AromeCacheManager:
