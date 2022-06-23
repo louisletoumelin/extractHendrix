@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -25,18 +26,12 @@ dict_with_all_emails = \
             <p> The extraction stopped at time: </p>
             <p style = "text-align: center;"> {time_of_problem} </p>
             <p style = "text-align: center;"> </p>
-            <p> We stopped while trying to reach this Vortex resource: </p>
-            <p style = "text-align: center;"> {resource_that_stopped} </p>
-            <p style = "text-align: left;"> </p>
             <p style = "text-align: left;"> We remind you that we are working here: </p>
             <p style = "text-align: center;">  {folder} </p>
             <p style = "text-align: center;"> </p>
             <p> <strong> We are now waiting {time_waiting} minutes</strong> before launching again commands on Hendrix. 
             <strong> You don't need to do anything.</strong></p>
-            <p> It is our try number: {nb_of_try}. </p>
-            <p style="margin-bottom:3cm;"> How long am I waiting? The first 5 attemps to reach Hendrix are distant from 30 min.
-            If Hendrix is still unreachable, we wait 1 hour between attemps. 
-            Finally, if we missed 10 attemps, we stop.</p>
+            <p> It is our attempt number: {nb_of_try}. </p>
             <pstyle="margin-bottom:1.5cm;"> </p>
             <p> </p>
             <p> Thank you for your understanding, </p>
@@ -60,9 +55,6 @@ dict_with_all_emails = \
             <p style = "text-align: center;"> {time_to_download} hours </p>
             <p style = "text-align: center;"> </p>
             <p style = "text-align: left;"> </p>
-            <p style = "text-align: left;"> If anything went wrong, it could be listed below: </p>
-            <p style = "text-align: center;">  {errors} </p>
-            <p style = "text-align: center;"> </p>
             <p style = "text-align: left;"> We remind you that we are working here: </p>
             <p style = "text-align: center;">  {folder} </p>
             <p style = "text-align: center;"> </p>
@@ -96,6 +88,12 @@ dict_with_all_emails = \
     )
 
 
+class DictNamespace():
+
+    def __init__(self, dict_):
+        self.__dict__ = dict_
+
+
 def send_email(email_address, subject, content):
     """Send email to email_address using Météo-France network"""
     server = smtplib.SMTP()
@@ -124,26 +122,50 @@ def get_first_and_last_name_from_email(email_address):
     return email_address.split("@")[0].replace('.', ' ').title()
 
 
-def send_succes_email(email_adress=None, config_user=None, current_time=None, time_to_download=None, errors=None, folder=None):
-    user = get_first_and_last_name_from_email(email_adress)
-    html = dict_with_all_emails["finished"][1].format(**locals())
-    subject = dict_with_all_emails["finished"][0]
-    send_email(email_adress, subject, html)
-    return
+def send_success_email(config_user):
+    def emailsender(current_time, time_to_download):
+        c = DictNamespace(config_user)
+        user = get_first_and_last_name_from_email(c.email_adress)
+        html = dict_with_all_emails["finished"][1].format(
+            user=user,
+            config_user=config_user,
+            current_time=current_time,
+            time_to_download=time_to_download,
+            folder=c.work_folder
+        )
+        subject = dict_with_all_emails["finished"][0]
+        send_email(c.email_adress, subject, html)
+    return emailsender
 
 
-def send_problem_extraction_email(email_adress=None, error_message=None, time_of_problem=None, resource_that_stopped=None, folder=None, nb_of_try=None, time_waiting=None):
-    user = get_first_and_last_name_from_email(email_adress)
-    html = dict_with_all_emails["problem_extraction"][1].format(
-        **locals())
-    subject = dict_with_all_emails["problem_extraction"][0]
-    send_email(email_adress, subject, html)
-    return
+def send_problem_extraction_email(config_user):
+    def emailsender(exception, time_fail, nb_attempts, time_to_next_retry):
+        c = DictNamespace(config_user)
+        user = get_first_and_last_name_from_email(c.email_adress)
+        html = dict_with_all_emails["problem_extraction"][1].format(
+            user=user,
+            error_message=exception,
+            time_of_problem=time_fail,
+            folder=c.work_folder,
+            time_waiting=time_to_next_retry,
+            nb_of_try=nb_attempts
+        )
+        subject = dict_with_all_emails["problem_extraction"][0]
+        send_email(c.email_adress, subject, html)
+    return emailsender
 
 
-def send_script_stopped_email(email_adress=None, config_user=None, current_time=None, error=None, folder=None):
-    user = get_first_and_last_name_from_email(email_adress)
-    html = dict_with_all_emails["script_stopped"][1].format(
-        **locals())
-    subject = dict_with_all_emails["script_stopped"][0]
-    send_email(email_adress, subject, html)
+def send_script_stopped_email(config_user):
+    def emailsender(exception, current_time):
+        c = DictNamespace(config_user)
+        user = get_first_and_last_name_from_email(c.email_adress)
+        html = dict_with_all_emails["script_stopped"][1].format(
+            user=user,
+            config_user=config_user,
+            error=exception,
+            current_time=current_time,
+            folder=c.work_folder,
+        )
+        subject = dict_with_all_emails["script_stopped"][0]
+        send_email(c.email_adress, subject, html)
+    return emailsender

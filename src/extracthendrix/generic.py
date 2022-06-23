@@ -38,7 +38,8 @@ class FolderLayout:
             try:
                 os.mkdir(getattr(self, subfolder))
             except FileExistsError:
-                print("Subfolder {subfolder} has already been created")
+                print("Subfolder {subfolder} has already been created".format(
+                    subfolder=subfolder))
 
 
 def send_problem_extraction_email_with_config(config_user):
@@ -65,7 +66,6 @@ def send_script_stopped_email_with_config(config_user):
             folder=config_user.folder,
         )
     return mailer
-
 
 
 class AromeCacheManager:

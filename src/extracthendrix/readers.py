@@ -9,6 +9,10 @@ import pkg_resources
 import functools
 import time as timeutils
 
+import ftplib
+from ftplib import FTP
+from netrc import netrc
+
 from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
 import xarray as xr
@@ -23,40 +27,15 @@ from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMat
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-def retry_and_finally_raise(onRetry, onFailure, time_retries):
-    """
-    Args:
-    cache_method (:obj:`method`): La méthode à exécuter
-    config_user (:obj:`extractHendrix.configreader.ConfigReader`): la configuration de l'utilisateur
-    time_retries (:obj:`list` of :obj:`datetime.timedelta`): les intervalles de temps au bout desquels relancer la fonction en cas d'échec
-    """
-    def decorator_retry(func):
-        @functools.wraps(func)
-        def wrapper_retry(*args):
-            if len(time_retries) == 0:
-                return func(*args)
-            for numretry, delta in enumerate(time_retries):
-                try:
-                    return func(*args)
-                except Exception as E:
-                    onRetry(E, timeutils.asctime(), numretry+1, delta)
-                    timeutils.sleep(delta.total_seconds())
-            # last attempt before giving up
-            try:
-                return func(*args)
-            except Exception as E:
-                onFailure(E, timeutils.asctime())
-                raise E
-        return wrapper_retry
-    return decorator_retry
 
-
-def onRetryDefault(exception_raised, time_fail, nb_attempts, time_to_next_retry):
-    print(exception_raised, time_fail, nb_attempts, time_to_next_retry)
-
-
-def onFailureDefault(exception_raised, current_time):
-    print(exception_raised, current_time)
+def return_path_if_exists_on_hendrix(ftp, path_resource):
+    file_name = path_resource.split('/')[-1]
+    path_folder = os.path.dirname(path_resource)
+    # Check that the file exist at the specified path
+    ftp.cwd(path_folder)
+    listing_folder = ftp.nlst()
+    full_file_name = next(x for x in listing_folder if file_name in x)
+    return os.path.join(path_folder, full_file_name)
 
 
 class NativeFileUnfetchedException(Exception):
@@ -311,9 +290,15 @@ class VortexWitchCraftReader(S2MTaskMixIn):
 
 
 class AromeHendrixReader(HendrixFileReader):
-    def __init__(self, folderLayout=None, model=None, runtime=None, member=None,getmode='get'):
+    def __init__(self,
+                 folderLayout=None,
+                 model=None,
+                 runtime=None,
+                 member=None,
+                 getmode='get',
+                 ):
         self.folderLayout = folderLayout
-        self.getmode=getmode
+        self.getmode = getmode
         self.runtime = runtime
         self.model_name = model
         self.member = member
@@ -333,6 +318,28 @@ class AromeHendrixReader(HendrixFileReader):
         )
         return hash_
 
+    def get_file_list(self, dateandtermiterator):
+        ftp = FTP('hendrix.meteo.fr')
+        credentials = netrc().authenticators('hendrix')
+        ftp.login(credentials[0], credentials[2])
+        filelist = []
+        notfound = []
+        for date_, term in dateandtermiterator:
+            resdesc = self._get_vortex_params(date_, term)
+            potential_locations = [
+                usevortex.get_resources(
+                    getmode='locate', **resource_description
+                )
+                for resource_description in resdesc]
+            for resource in potential_locations:
+                try:
+                    filelist.append(return_path_if_exists_on_hendrix(
+                        ftp, resource[0].split(':')[1]))
+                except (ftplib.error_perm, StopIteration):
+                    notfound.append(resource[0])
+        ftp.close()
+        return filelist, notfound
+
     def _get_vortex_params(self, date, term):
         params = [dict(
             **model_description,
@@ -341,10 +348,10 @@ class AromeHendrixReader(HendrixFileReader):
         ) for model_description in self.model_description_and_alternative_parameters]
         if self.getmode == 'get':
             for param in params:
-                param['local'] = os.path.join(self.native_file_path(date, term))
+                param['local'] = os.path.join(
+                    self.native_file_path(date, term))
         return params
 
-    @retry_and_finally_raise(onRetryDefault, onFailureDefault, [])
     def get_native_file(self, date, term, autofetch=True):
         """
         """
