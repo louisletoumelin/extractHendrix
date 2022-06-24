@@ -38,7 +38,7 @@ def get_prestaging_file_list(ftpconnection, dateterm_iterator, model_name, runti
         runtime=runtime
     )
     for date_, term in dateterm_iterator:
-        resdesc = reader._get_vortex_params(date_, term)
+        resdesc = reader._get_vortex_resource_description(date_, term)
         potential_locations = [usevortex.get_resources(
             getmode='locate', **resource_description) for resource_description in resdesc]
         for resource in potential_locations:

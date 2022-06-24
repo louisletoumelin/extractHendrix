@@ -15,12 +15,12 @@ native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
 
 arome_extr = AromeHendrixReader(
     native_files_folder=native_files_folder, model='AROME', runtime=time(0))
-# arome_extr.model_description_and_alternative_parameters = arome_extr.model_description_and_alternative_parameters[0:1]
+# arome_extr.list_model_descriptions = arome_extr.list_model_descriptions[0:1]
 
 _date = date(2022, 4, 6)
 term = 3
 path = arome_extr.native_file_path(_date, term)
-params = arome_extr._get_vortex_params(_date, term, path)[1]
+params = arome_extr._get_vortex_resource_description(_date, term, path)[1]
 arome_extr.get_native_file(_date, term)
 params
 

@@ -96,9 +96,23 @@ class DictNamespace:
         self.__dict__ = dict_
 
 
+def check_config_user(config_user):
+    assert config_user["start_date"] <= config_user["end_date"], "Start date must be before or equal to end date"
+
+    if not isinstance(config_user["domain"], list):
+        config_user["domain"] = list(config_user["domain"])
+    assert isinstance(config_user["domain"], list)
+
+    if config_user["groupby"][0] == 'timeseries':
+        str_raise = "In mode time series, between duration between terms must be 24h"
+        assert config_user["end_term"] - config_user["start_term"] == 24, str_raise
+
+
 def execute(config_user):
     # Record time
     extraction_starts = datetime.now()
+
+    check_config_user(config_user)
 
     # A trick to use c.attribute instead of c["attribute"]
     c = DictNamespace(config_user)
@@ -109,20 +123,20 @@ def execute(config_user):
     # Initialize grouper
     grouper = Grouper(c.groupby)
 
+    # Initialize computer
     computer = ComputedValues(
         layout,
         domain=c.domain,
         computed_vars=c.variables,
         analysis_hour=c.analysis_hour,
-        autofetch_native=True
-    )
+        autofetch_native=True)
 
     previous = (c.start_date, c.start_term)
     for date_, term in dateiterator(c.start_date, c.end_date, c.start_term, c.end_term, c.delta_terms):
+
         if grouper.batch_is_complete(c.analysis_hour, previous, (date_, term)):
-            computer.concat_files_and_forget(
-                grouper.filetag(c.analysis_hour, *previous)
-            )
+            time_tag = grouper.filetag(c.analysis_hour, *previous)
+            computer.concat_files_and_forget(time_tag)
 
         retry_and_finally_raise(
             onRetry=send_problem_extraction_email(config_user),
@@ -131,12 +145,14 @@ def execute(config_user):
 
         previous = (date_, term)
 
-    computer.concat_files_and_forget(
-        grouper.filetag(c.analysis_hour, *previous)
-    )
+    last_time_tag = grouper.filetag(c.analysis_hour, *previous)
+    computer.concat_files_and_forget(last_time_tag)
+
+    # Record end time
     extraction_ends = datetime.now()
-    send_success_email(config_user)(
-        extraction_ends, extraction_ends - extraction_starts)
+
+    # Email
+    send_success_email(config_user)(extraction_ends, extraction_ends - extraction_starts)
 
 
 def get_prestaging_file_list(config_user):

@@ -20,7 +20,7 @@ import usevortex
 import numpy as np
 import epygram
 
-# from extracthendrix.core import get_model_description, CanNotReadEpygramField, CanNotAccessVortexResource
+# from extracthendrix.core import get_all_resource_descriptions, CanNotReadEpygramField, CanNotAccessVortexResource
 from extracthendrix.config.config_fa_or_grib2nc import transformations, alternatives_names_fa
 from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMatchException, GeometryIsMissingException
 
@@ -45,20 +45,20 @@ class NativeFileUnfetchedException(Exception):
 def model_ini_to_dict(model_name):
     """Converts config/models.ini into a dictionary"""
     config = configparser.ConfigParser()
-    models_path = pkg_resources.resource_filename(
-        'extracthendrix.config', 'models.ini')
+    models_path = pkg_resources.resource_filename('extracthendrix.config', 'models.ini')
     config.read(models_path)
     dict_model = dict(config[model_name])
     return dict_model
 
-
-def get_model_description(model_name, member=None):
+#  old get_model_description
+def get_all_resource_descriptions(model_name, member=None):
     """Get vortex description of a model"""
 
     dict_model = model_ini_to_dict(model_name)
 
     for key in dict_model.keys():
         dict_model[key] = dict_model[key].split(',')
+
     if member:
         dict_model['member'] = [member]
 
@@ -70,16 +70,16 @@ def get_model_description(model_name, member=None):
 
 class HendrixFileReader:
     def file_in_cache_path(self, date, term):
-        return os.path.join(
-            self.folderLayout._cache_,
-            self.get_file_hash(date, term)
-        )
+        """Not used"""
+        filepath = self.folderLayout._cache_
+        filename = self.get_file_hash(date, term)
+        return os.path.join(filepath, filename)
 
     def native_file_path(self, date, term):
-        return os.path.join(
-            self.folderLayout._native_,
-            '.'.join([self.get_file_hash(date, term), self.fmt])
-        )
+        filepath = self.folderLayout._native_
+        filename = self.get_file_hash(date, term)
+        filename = f"{filename}.{self.fmt}"
+        return os.path.join(filepath, filename)
 
 
 available_combinations = [
@@ -271,7 +271,7 @@ class Config(object):
 class VortexWitchCraftReader(S2MTaskMixIn):
     def __init__(self, filepath=None, model=None, geometry=None, previ=None, member=None, rundatetime=None, datebegin=None, dateend=None):
         self.conf = Config()
-        self.resource_description = get_model_description(model)[0]
+        self.resource_description = get_all_resource_descriptions(model)[0]
         self.resource_description.update(
             cutoff='production' if previ else 'assimilation',
             geometry=geometry,
@@ -302,12 +302,13 @@ class AromeHendrixReader(HendrixFileReader):
         self.runtime = runtime
         self.model_name = model
         self.member = member
-        # ce dernier attribut est une liste, contenant les valeurs possibles des paramètres pour un même modèle (elles peuvent changer!!!)
-        self.model_description_and_alternative_parameters = get_model_description(
-            model, member)
-        self.fmt = self.model_description_and_alternative_parameters[0]['nativefmt']
+        # List with all model descriptions possibles (including alternative parameters such as "namespace")
+        self.list_resource_descriptions = get_all_resource_descriptions(model, member) # old list_model_descriptions
+        self.fmt = self.list_resource_descriptions[0]['nativefmt']  # FA or GRIB
 
+    #todo for Hugo, before three methods "get_file_hash", now two
     def get_file_hash(self, date, term):
+        """Not used"""
         hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}".format(
             model=self.model_name,
             date=date.strftime("%Y%m%d"),
@@ -325,7 +326,7 @@ class AromeHendrixReader(HendrixFileReader):
         filelist = []
         notfound = []
         for date_, term in dateandtermiterator:
-            resdesc = self._get_vortex_params(date_, term)
+            resdesc = self._get_vortex_resource_description(date_, term)
             potential_locations = [
                 usevortex.get_resources(
                     getmode='locate', **resource_description
@@ -340,35 +341,52 @@ class AromeHendrixReader(HendrixFileReader):
         ftp.close()
         return filelist, notfound
 
-    def _get_vortex_params(self, date, term):
-        params = [dict(
+    def _get_vortex_resource_description(self, date, term):
+        resource_descriptions = [dict(
             **model_description,
             date=datetime.combine(date=date, time=self.runtime),
             term=term
-        ) for model_description in self.model_description_and_alternative_parameters]
+        ) for model_description in self.list_resource_descriptions]
+
+        # todo I don't understand here
         if self.getmode == 'get':
-            for param in params:
-                param['local'] = os.path.join(
-                    self.native_file_path(date, term))
-        return params
+            for resource in resource_descriptions:
+                resource['local'] = os.path.join(self.native_file_path(date, term))
+
+        return resource_descriptions
 
     def get_native_file(self, date, term, autofetch=True):
         """
+        Download files on Hendrix if necessary.
+
+        :param date: runtime
+        :param term: forecast lead time
+        :param autofetch:
+        :return: filepath, str
         """
         filepath = self.native_file_path(date, term)
-        # on vérifie s'il n'existe pas déjà
-        if os.path.isfile(filepath):
+
+        # If file is downloaded, we skip
+        file_already_downloaded = os.path.isfile(filepath)
+        if file_already_downloaded:
             return filepath
+
+        # todo autofetch?
         if not autofetch:
             raise NativeFileUnfetchedException()
+
+        # Try every combinations od resource description possible
+        # resource description = model description in Vortex
         last_exception = None
-        for param in self._get_vortex_params(date, term):
-            # ici au cas ou il y ait plusieurs combinaisons de paramètres vortex
-            # valables à différents instants pour le même modèle, on les
-            # essaie successivement
+        for resource_description in self._get_vortex_resource_description(date, term):
             try:
-                usevortex.get_resources(getmode='epygram', **param)
+                usevortex.get_resources(getmode='epygram', **resource_description)
                 return filepath
             except Exception as e:
                 last_exception = e
+
+        # If not combination works, raise the error
         raise last_exception
+
+
+# todo for Hugo: Vortex description, parameter, model description, resource description becomes resource description

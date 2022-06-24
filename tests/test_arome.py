@@ -46,7 +46,7 @@ def test_put_in_cache_arome(helpers):
         autofetch_native=False
     )
     cache_manager.put_in_cache(date_, term)
-    expected_name = cache_manager.get_cache_path(date_, term)
+    expected_name = cache_manager.get_path_file_in_cache(date_, term)
     assert os.path.isfile(os.path.join(folderLayout._cache_, expected_name))
 
 

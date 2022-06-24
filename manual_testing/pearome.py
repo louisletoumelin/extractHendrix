@@ -38,11 +38,11 @@ term=2
 cache_manager.put_in_cache(date_, term)
 
 cache_manager.extractor.get_file_hash(date_, term)
-cache_manager.extractor.model_description_and_alternative_parameters
+cache_manager.extractor.list_model_descriptions
 
 
 
-filepath = cache_manager.get_cache_path(date_,term)
+filepath = cache_manager.get_path_file_in_cache(date_,term)
 
 import xarray as xr
 
