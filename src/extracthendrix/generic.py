@@ -30,7 +30,6 @@ class FolderLayout:
     """
 
     def __init__(self, work_folder):
-        """Constructor method"""
         self.work_folder = work_folder
         self._create_layout()
 
@@ -49,11 +48,12 @@ class FolderLayout:
     def _create_layout(self):
         """
         Creates folder and subfolders for the current extraction
-        ├── folder
+
+        ├── work_folder
         │   ├── _native_
         │   ├── _cache_
         │   ├── _computed_
-        │   ├── _final_                         
+        │   ├── _final_
         """
         # Parent folder
         self._create_folder_if_doesnt_exist(self.work_folder)
@@ -244,6 +244,17 @@ def sort_native_vars_by_model(computed_vars):
 
 
 def validity_date(runtime, date_, term):
+    """
+    Compute the validity date of a run given runtime and term
+
+    :param runtime: Runtime
+    :type runtime: Float
+    :param date_: Run time day
+    :type date_: datetime
+    :param term: Term
+    :type term: Float
+    :return: datetime
+    """
     return datetime.combine(date_, time(hour=runtime)) + timedelta(hours=term)
 
 

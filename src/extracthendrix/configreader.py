@@ -48,12 +48,31 @@ def retry_and_finally_raise(
     return decorator_retry
 
 
-class Grouper():
+class Grouper:
+    """
+    Handles grouping of downladed files (daily, monthly...etc)
 
+    Takes care of grouping file according to the user demands, whenever the files are downloaded.
+    This is better than concatenating files at the end because of lower file redundance and memory footprint.
+
+    :param groupby: time period to group by outputs files
+    :type groupby: str
+    """
     def __init__(self, groupby):
         self.groupby = groupby
 
     def filetag(self, runtime, date_, term):
+        """
+        Gives a tag (str) of the date for which the extraction is valid.
+
+        :param runtime: hour of the run
+        :type runtime: int
+        :param date_: date of the run
+        :type date_: datetime
+        :param term: hour of the term
+        :type term: int
+        :return: str (e.g. "2020-09-5")
+        """
         if self.groupby == ('timeseries', 'daily'):
             return validity_date(runtime, date_, term).strftime("%Y-%m-%d")
         if self.groupby == ('timeseries', 'monthly'):
@@ -62,6 +81,7 @@ class Grouper():
             return validity_date(runtime, date_, 0).strftime("%Y-%m-%d")
 
     def batch_is_complete(self, runtime, previous, current):
+        """Detect when next day/month is extracted"""
         if self.groupby == ('timeseries', 'daily'):
             return validity_date(runtime, *previous).day != validity_date(runtime, *current).day
         if self.groupby == ('timeseries', 'monthly'):
@@ -70,17 +90,25 @@ class Grouper():
             return previous[0] != current[0]
 
 
-class DictNamespace():
-
+class DictNamespace:
+    """A trick to use attributes instead of dictionary keys"""
     def __init__(self, dict_):
         self.__dict__ = dict_
 
 
 def execute(config_user):
+    # Record time
     extraction_starts = datetime.now()
+
+    # A trick to use c.attribute instead of c["attribute"]
     c = DictNamespace(config_user)
+
+    # Create folder and subfolders
     layout = FolderLayout(work_folder=c.work_folder)
+
+    # Initialize grouper
     grouper = Grouper(c.groupby)
+
     computer = ComputedValues(
         layout,
         domain=c.domain,
@@ -88,17 +116,21 @@ def execute(config_user):
         analysis_hour=c.analysis_hour,
         autofetch_native=True
     )
+
     previous = (c.start_date, c.start_term)
     for date_, term in dateiterator(c.start_date, c.end_date, c.start_term, c.end_term, c.delta_terms):
         if grouper.batch_is_complete(c.analysis_hour, previous, (date_, term)):
             computer.concat_files_and_forget(
                 grouper.filetag(c.analysis_hour, *previous)
             )
+
         retry_and_finally_raise(
             onRetry=send_problem_extraction_email(config_user),
             onFailure=send_script_stopped_email(config_user)
         )(computer.compute)(date_, term)
+
         previous = (date_, term)
+
     computer.concat_files_and_forget(
         grouper.filetag(c.analysis_hour, *previous)
     )
