@@ -22,30 +22,46 @@ logger.setLevel(logging.DEBUG)
 
 
 class FolderLayout:
+    """
+    Creates directory where files are stored
+
+    :param work_folder: Path to main folder where extraction is done
+    :type work_folder: str
+    """
 
     def __init__(self, work_folder):
+        """Constructor method"""
         self.work_folder = work_folder
         self._create_layout()
 
     @staticmethod
     def _create_folder_if_doesnt_exist(path):
+        """Create a folder if it doesn't already exists
+
+        :param path: Folder path
+        :type path: str
+        """
         try:
             os.mkdir(path)
         except FileExistsError:
             print(f"Folder {path} already exists")
 
     def _create_layout(self):
+        """
+        Creates folder and subfolders for the current extraction
+        ├── folder
+        │   ├── _native_
+        │   ├── _cache_
+        │   ├── _computed_
+        │   ├── _final_                         
+        """
+        # Parent folder
+        self._create_folder_if_doesnt_exist(self.work_folder)
 
-        try:
-            os.mkdir(self.work_folder)
-        except FileExistsError:
-            print(f"Folder {self.work_folder} already exists")
+        # Subfolders
         for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
             setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
-            try:
-                os.mkdir(getattr(self, subfolder))
-            except FileExistsError:
-                print(f"Subfolder {subfolder} has already been created")
+            self._create_folder_if_doesnt_exist(getattr(self, subfolder))
 
 
 class AromeCacheManager:
