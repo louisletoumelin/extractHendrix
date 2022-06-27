@@ -7,6 +7,8 @@ from datetime import time, datetime, timedelta
 import time as timeutils
 from collections import defaultdict
 import glob
+import shutil
+import uuid
 
 import numpy as np
 import epygram
@@ -14,7 +16,7 @@ import xarray as xr
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email
 
 from extracthendrix.readers import AromeHendrixReader
-from extracthendrix.config.domains import domains
+from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.config.config_fa_or_grib2nc import alternatives_names_fa
 from extracthendrix.exceptions import CanNotReadEpygramField
 
@@ -64,6 +66,10 @@ class FolderLayout:
             setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
             self._create_folder_if_doesnt_exist(getattr(self, subfolder))
 
+    def clean_layout(self):
+        for subfolder in ['_native_', '_cache_', '_computed_']:
+            shutil.rmtree(getattr(self, subfolder))
+
 
 class AromeCacheManager:
 
@@ -82,14 +88,14 @@ class AromeCacheManager:
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(folderLayout, model, runtime, member)
-        self.domain = domains[domain]
+        self.domain = domain
         self.variables = variables
         self.runtime = runtime
         self.autofetch_native = autofetch_native
         self.opened_files = {}
 
     # old get_cache_path
-    def get_path_file_in_cache(self, date, term):
+    def get_path_file_in_cache(self, date, term, domain):
         """
         Return full path to file in cache for a given run time and forecast lead time
 
@@ -100,22 +106,23 @@ class AromeCacheManager:
         :return: str
         """
         filename = self.extractor.get_file_hash(date, term)
-        filename = f"{filename}.nc"
+        filename = f"{filename}_{domain}.nc"
         folder = self.folderLayout._cache_
         return os.path.join(folder, filename)
 
-    def extract_subgrid(self, field):
+    def extract_subgrid(self, field, domain):
         """Extract pixels of an Epygram field corresponding to a user defined domain"""
+        domain_description = domains_descriptions[domain]
         if self.extractor.model_name not in ['AROME', 'AROME_SURFACE']:
-            i1, j1 = np.round(field.geometry.ll2ij(self.domain['lon_llc'], self.domain['lat_llc'])) + 1
-            i2, j2 = np.round(field.geometry.ll2ij(self.domain['lon_urc'], self.domain['lat_urc'])) + 1
+            i1, j1 = np.round(field.geometry.ll2ij(domain_description['lon_llc'], domain_description['lat_llc'])) + 1
+            i2, j2 = np.round(field.geometry.ll2ij(domain_description['lon_urc'], domain_description['lat_urc'])) + 1
             field = field.extract_subarray(int(i1), int(i2), int(j1), int(j2))
         else:
             field = field.extract_subarray(
-                self.domain['first_i'],
-                self.domain['last_i'],
-                self.domain['first_j'],
-                self.domain['last_j'])
+                domain_description['first_i'],
+                domain_description['last_i'],
+                domain_description['first_j'],
+                domain_description['last_j'])
         return field
 
     @staticmethod
@@ -158,12 +165,12 @@ class AromeCacheManager:
                 field.fid['netCDF'] = field.fid['GRIB2']['shortName']
             return field
 
-    def get_native_resource(self, date, term):
+    def get_native_resource_if_necessary(self, date, term):
         native_file_path = self.extractor.get_native_file(date, term, autofetch=self.autofetch_native)
         input_resource = epygram.formats.resource(native_file_path, 'r', fmt=self.extractor.fmt.upper())
         return native_file_path, input_resource
 
-    def put_in_cache(self, date, term):
+    def put_in_cache(self, date, term, domain):
         """
         Builds a single netcdf file corresponding to a single fa or grib file.
 
@@ -174,16 +181,16 @@ class AromeCacheManager:
         """
 
         # Check if file is already in cache
-        filepath_in_cache = self.get_path_file_in_cache(date, term)
+        filepath_in_cache = self.get_path_file_in_cache(date, term, domain)
         if os.path.isfile(filepath_in_cache):
             return
-
-        # Download file on Hendrix if necessary
-        native_file_path, input_resource = self.get_native_resource(date, term)
 
         # Open Epygram resource
         output_resource = epygram.formats.resource(filepath_in_cache, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
+
+        # Download file on Hendrix if necessary
+        native_file_path, input_resource = self.get_native_resource_if_necessary(date, term)
 
         # Extract variable from native file (i.e. .fa or .grib)
         for variable in self.variables:
@@ -191,13 +198,9 @@ class AromeCacheManager:
             field = self.pass_metadata_to_netcdf(field, variable.outname)
             if field.spectral:
                 field.sp2gp()
-            field = self.extract_subgrid(field)
+            field = self.extract_subgrid(field, domain)
             output_resource.writefield(field)
         logger.debug(f" .fa or .grib file converted to netcdf for date {date} and term {term}\n\n")
-
-        # Delete .fa or .grib file after extraction of desired variables
-        if self.delete_native:
-            os.remove(native_file_path)
 
     def get_file_in_cache(self, filepath):
         if filepath not in self.opened_files:
@@ -209,21 +212,28 @@ class AromeCacheManager:
         self.opened_files[filepath] = dataset
 
     def forget_opened_files(self):
-        del self.opened_files
+        self.opened_files = {}
 
     def close_file(self, date, term):
         """Not used"""
-        filepath = self.get_path_file_in_cache(date, term)
+        filepath = self.get_path_file_in_cache(date, term, domain)
         file = self.opened_files[filepath]
         file['dataset'].close()
         del self.opened_files[filepath]
 
-    def read_cache(self, date, term, native_variables):
+    def delete_native_files(self):
+        """Delete .fa or .grib file after extraction of desired variables"""
+        if self.delete_native:
+            files = glob.glob(f'{self.folderLayout._native_}/*')
+            for f in files:
+                os.remove(f)
+
+    def read_cache(self, date, term, domain, native_variables):
         # Check file in cache and download if necessary
-        filepath_in_cache = self.get_path_file_in_cache(date, term)
+        filepath_in_cache = self.get_path_file_in_cache(date, term, domain)
         file_is_not_in_cache = not os.path.isfile(filepath_in_cache)
         if file_is_not_in_cache:
-            self.put_in_cache(date, term)
+            self.put_in_cache(date, term, domain)
 
         # Return the file from cache
         dataset = self.get_file_in_cache(filepath_in_cache)
@@ -337,20 +347,25 @@ class ComputedValues:
         [os.remove(filename) for filename in list_of_files]
 
     # old save_final_netcd
-    def _concat_files_and_save_netcdf(self, time_tag, member):
-        ds = xr.open_mfdataset(self.computed_files[member], concat_dim='time')
-        ds.to_netcdf(self.get_path_file_in_final(time_tag, member))
+    def _concat_files_and_save_netcdf(self, time_tag, member, domain):
+        if self.computed_files[(member, domain)]:
+            ds = xr.open_mfdataset(self.computed_files[(member, domain)], concat_dim='time')
+            ds.to_netcdf(self.get_path_file_in_final(time_tag, member, domain))
+        else:
+            print(f"self.computed_files[(member, domain)] is empty")
 
-    def _delete_and_forget_computed_files(self, member):
+    def _delete_and_forget_computed_files(self, member, domain):
         if self.delete_computed_netcdf:
-            self._delete_files_in_list_of_files(self.computed_files[member])
-        del self.computed_files[member]
+            self._delete_files_in_list_of_files(self.computed_files[(member, domain)])
+        if self.computed_files[(member, domain)]:
+            del self.computed_files[(member, domain)]
 
     # old concat_files_and_forget
     def concat_and_clean_computed_folder(self, time_tag):
         for member in self.members:
-            self._concat_files_and_save_netcdf(time_tag, member)
-            self._delete_and_forget_computed_files(member)
+            for domain in self.domain:
+                self._concat_files_and_save_netcdf(time_tag, member, domain)
+                self._delete_and_forget_computed_files(member, domain)
 
     def delete_files_in_cache(self):
         files = glob.glob(f'{self.folderLayout._cache_}/*')
@@ -358,20 +373,23 @@ class ComputedValues:
             os.remove(f)
 
     def clean_cache_folder(self):
-        for cache_manager in self.cache_managers:
+        for cache_manager in self.cache_managers.values():
             cache_manager.forget_opened_files()
         self.delete_files_in_cache()
 
     # old get_file_hash
-    def get_name_file_in_computed(self, date, term, member):
+    def get_name_file_in_computed(self, date, term, member, domain):
+        date_str = f"date_{date.strftime('%Y%m%d')}"
+        run_str = f"runtime_{self.analysis_hour}h"
+        term_str = f"term_{term}h"
         member_str = f"_mb{member:03d}" if member else ""
-        filename = f"run_{date.strftime('%Y%m%d')}T{self.analysis_hour}-00-00Z-term_{term}h{member_str}.nc"
+        filename = f"{self.model}_{date_str}_{run_str}_{term_str}_{domain}{member_str}.nc"
         return filename
 
     # old get_filepath
     def get_path_file_in_computed(self, date, term, member, domain):
         filepath = self.folderLayout._computed_
-        filename = self.get_name_file_in_computed(date, term, member)
+        filename = self.get_name_file_in_computed(date, term, member, domain)
         return os.path.join(filepath, filename)
 
     def get_path_file_in_final(self, time_tag, member, domain):
@@ -393,33 +411,77 @@ class ComputedValues:
         computed_dataset = computed_dataset.expand_dims(dim='time').set_coords('time')
         computed_dataset.to_netcdf(filepath_computed)
 
-    def compute_variables_in_cache(self, computed_var, member, date, term):
+    def _move_files_to_domain_folders(self):
+        for domain in self.domain:
+            # Create a folder for each domain
+            path_domain = os.path.join(self.folderLayout._final_, domain)
+            if not os.path.exists(path_domain):
+                os.makedirs(path_domain)
+
+            for file in os.listdir(self.folderLayout._final_):
+                if (domain in file) and (file != domain):
+                    current_path = os.path.join(self.folderLayout._final_, file)
+                    new_path = os.path.join(path_domain, file)
+                    os.rename(current_path, new_path)
+
+    def _rename_final_folder(self):
+        date_str = datetime.now().strftime("%Y_%m_%d_%H")
+        id_ = str(uuid.uuid1())[:5]
+        filename = f"HendrixExtraction_{date_str}_ID_{id_}"
+        new_name = os.path.join(self.folderLayout, filename)
+        os.rename(self.folderLayout._final_, new_name)
+
+    def clean_final_folder(self):
+        self._move_files_to_domain_folders()
+        date_str = datetime.now().strftime("%Y_%m_%d_%H")
+        id_ = str(uuid.uuid1())[:5]
+        filename = f"HendrixExtraction_{date_str}_ID_{id_}"
+        new_name = os.path.join(self.folderLayout.work_folder, filename)
+        os.rename(self.folderLayout._final_, new_name)
+
+    def files_are_in_final(self, time_tag):
+
+        # Look at files already computed
+        files_in_final = []
+        for member in self.members:
+            for domain in self.domain:
+                path_file_in_final = self.get_path_file_in_final(time_tag, member, domain)
+                files_in_final.append(os.path.isfile(path_file_in_final))
+
+        return any(files_in_final)
+
+    def compute_variables_in_cache(self, computed_var, member, date, term, domain):
 
         # Parameters to read in cache
         model_name = self.get_model_name_from_computed_var(computed_var)
         read_cache_func = self.cache_managers[(model_name, member)].read_cache
         list_native_vars = computed_var.native_vars
 
-        computed_values = computed_var.compute(read_cache_func, date, term, *list_native_vars)
+        computed_values = computed_var.compute(read_cache_func, date, term, domain, *list_native_vars)
         return computed_values
+
+    def delete_native_files(self):
+        for cache_manager in self.cache_managers.values():
+            # Delete .fa or .grib file after extraction of desired variables
+            cache_manager.delete_native_files()
 
     def compute(self, date, term):
         for member in self.members:
             for domain in self.domain:
 
                 # Look at files already computed
-                path_file_in_computed = self.get_path_file_in_computed(date, term, member)
+                path_file_in_computed = self.get_path_file_in_computed(date, term, member, domain)
                 file_is_already_computed = os.path.isfile(path_file_in_computed)
 
                 if file_is_already_computed:
-                    self.computed_files[member].append(path_file_in_computed)
+                    self.computed_files[(member, domain)].append(path_file_in_computed)
                 else:
                     # Store computed values before saving to netcdf
                     variables_storage = defaultdict(lambda: [])
 
                     # Iterate on variables asked by the user (i.e. computed var)
                     for computed_var in self.computed_vars:
-                        computed_values = self.compute_variables_in_cache(computed_var, member, date, term)
+                        computed_values = self.compute_variables_in_cache(computed_var, member, date, term, domain)
                         variables_storage[computed_var.name] = computed_values
                     variables_storage['time'] = validity_date(self.analysis_hour, date, term)
 
@@ -427,4 +489,6 @@ class ComputedValues:
                     self.save_computed_vars_to_netcdf(path_file_in_computed, variables_storage)
 
                     # Remember that current file is computed
-                    self.computed_files[member].append(path_file_in_computed)
+                    self.computed_files[(member, domain)].append(path_file_in_computed)
+
+            self.delete_native_files()

@@ -75,7 +75,8 @@ class HendrixFileReader:
         filename = self.get_file_hash(date, term)
         return os.path.join(filepath, filename)
 
-    def native_file_path(self, date, term):
+    # old native_file_path
+    def get_path_file_in_native(self, date, term):
         filepath = self.folderLayout._native_
         filename = self.get_file_hash(date, term)
         filename = f"{filename}.{self.fmt}"
@@ -306,9 +307,7 @@ class AromeHendrixReader(HendrixFileReader):
         self.list_resource_descriptions = get_all_resource_descriptions(model, member) # old list_model_descriptions
         self.fmt = self.list_resource_descriptions[0]['nativefmt']  # FA or GRIB
 
-    #todo for Hugo, before three methods "get_file_hash", now two
     def get_file_hash(self, date, term):
-        """Not used"""
         hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}".format(
             model=self.model_name,
             date=date.strftime("%Y%m%d"),
@@ -351,7 +350,7 @@ class AromeHendrixReader(HendrixFileReader):
         # todo I don't understand here
         if self.getmode == 'get':
             for resource in resource_descriptions:
-                resource['local'] = os.path.join(self.native_file_path(date, term))
+                resource['local'] = os.path.join(self.get_path_file_in_native(date, term))
 
         return resource_descriptions
 
@@ -364,7 +363,7 @@ class AromeHendrixReader(HendrixFileReader):
         :param autofetch:
         :return: filepath, str
         """
-        filepath = self.native_file_path(date, term)
+        filepath = self.get_path_file_in_native(date, term)
 
         # If file is downloaded, we skip
         file_already_downloaded = os.path.isfile(filepath)

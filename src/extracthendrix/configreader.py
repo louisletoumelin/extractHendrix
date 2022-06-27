@@ -19,8 +19,8 @@ def onFailureDefault(exception_raised, current_time):
 def retry_and_finally_raise(
         onRetry=onRetryDefault,
         onFailure=onFailureDefault,
-        time_retries=[timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]]
-):
+        time_retries=[]
+):  #[timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]]
     """
     Args:
     cache_method (:obj:`method`): La méthode à exécuter
@@ -113,7 +113,7 @@ def execute(config_user):
     # Record time
     extraction_starts = datetime.now()
 
-    #check_config_user(config_user)
+    check_config_user(config_user)
 
     # A trick to use c.attribute instead of c["attribute"]
     c = DictNamespace(config_user)
@@ -136,26 +136,36 @@ def execute(config_user):
     previous = (c.start_date, c.start_term)
     for date_, term in dateiterator(c.start_date, c.end_date, c.start_term, c.end_term, c.delta_terms):
 
-        if grouper.batch_is_complete(c.analysis_hour, previous, (date_, term)):
-            time_tag = grouper.filetag(c.analysis_hour, *previous)
-            computer.concat_and_clean_computed_folder(time_tag)
-            computer.clean_cache_folder()
+        time_tag = grouper.filetag(c.analysis_hour, *previous)
 
-        retry_and_finally_raise(
-            onRetry=send_problem_extraction_email(config_user),
-            onFailure=send_script_stopped_email(config_user)
-        )(computer.compute)(date_, term)
+        # Look if all files (all members and all domains) are already in final folder
+        if computer.files_are_in_final(time_tag):
+            continue
+        else:
+            if grouper.batch_is_complete(c.analysis_hour, previous, (date_, term)):
+                computer.concat_and_clean_computed_folder(time_tag)
+                computer.clean_cache_folder()
 
-        previous = (date_, term)
+            retry_and_finally_raise(
+                onRetry=send_problem_extraction_email(config_user),
+                onFailure=send_script_stopped_email(config_user)
+            )(computer.compute)(date_, term)
+
+            previous = (date_, term)
 
     last_time_tag = grouper.filetag(c.analysis_hour, *previous)
-    computer.concat_files_and_forget(last_time_tag)
+    computer.concat_and_clean_computed_folder(last_time_tag)
+    computer.clean_cache_folder()
 
     # Record end time
     extraction_ends = datetime.now()
 
     # Email
     send_success_email(config_user)(extraction_ends, extraction_ends - extraction_starts)
+
+    # Clean predictions
+    layout.clean_layout()
+    computer.clean_final_folder()
 
 
 def get_prestaging_file_list(config_user):
