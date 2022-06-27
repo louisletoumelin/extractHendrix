@@ -9,8 +9,8 @@ from extracthendrix.config.variables import pearome
 import extracthendrix.config.variables.arome_native as an
 
 
-test_folder = '/home/merzisenh/NO_SAVE/extracthendrix/testing'
-test_data_folder = '/home/merzisenh/NO_SAVE/test_data_extracthendrix'
+test_folder = f"/cnrm/cen/users/NO_SAVE/{os.environ['HOME'].split('/')[-1]}/extracthendrix/testing"
+test_data_folder = '/cnrm/cen/users/NO_SAVE/merzisenh/test_data_extracthendrix/'
 folderLayout = FolderLayout(work_folder=test_folder)
 
 

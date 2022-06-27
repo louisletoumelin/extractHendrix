@@ -64,6 +64,7 @@ class Grouper:
     def filetag(self, runtime, date_, term):
         """
         Gives a tag (str) of the date for which the extraction is valid.
+        e.g. "2020-09-5"
 
         :param runtime: hour of the run
         :type runtime: int
@@ -71,7 +72,7 @@ class Grouper:
         :type date_: datetime
         :param term: hour of the term
         :type term: int
-        :return: str (e.g. "2020-09-5")
+        :return: str
         """
         if self.groupby == ('timeseries', 'daily'):
             return validity_date(runtime, date_, term).strftime("%Y-%m-%d")
@@ -112,7 +113,7 @@ def execute(config_user):
     # Record time
     extraction_starts = datetime.now()
 
-    check_config_user(config_user)
+    #check_config_user(config_user)
 
     # A trick to use c.attribute instead of c["attribute"]
     c = DictNamespace(config_user)
@@ -129,14 +130,16 @@ def execute(config_user):
         domain=c.domain,
         computed_vars=c.variables,
         analysis_hour=c.analysis_hour,
-        autofetch_native=True)
+        autofetch_native=True,
+        model=c.model)
 
     previous = (c.start_date, c.start_term)
     for date_, term in dateiterator(c.start_date, c.end_date, c.start_term, c.end_term, c.delta_terms):
 
         if grouper.batch_is_complete(c.analysis_hour, previous, (date_, term)):
             time_tag = grouper.filetag(c.analysis_hour, *previous)
-            computer.concat_files_and_forget(time_tag)
+            computer.concat_and_clean_computed_folder(time_tag)
+            computer.clean_cache_folder()
 
         retry_and_finally_raise(
             onRetry=send_problem_extraction_email(config_user),

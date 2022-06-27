@@ -380,7 +380,7 @@ class AromeHendrixReader(HendrixFileReader):
         last_exception = None
         for resource_description in self._get_vortex_resource_description(date, term):
             try:
-                usevortex.get_resources(getmode='epygram', **resource_description)
+                r = usevortex.get_resources(getmode='epygram', **resource_description)
                 return filepath
             except Exception as e:
                 last_exception = e
@@ -388,5 +388,3 @@ class AromeHendrixReader(HendrixFileReader):
         # If not combination works, raise the error
         raise last_exception
 
-
-# todo for Hugo: Vortex description, parameter, model description, resource description becomes resource description

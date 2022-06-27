@@ -34,6 +34,6 @@ previous = (date_start, first_term)
 for date_, term in dateiterator(date_start, date_end, first_term, last_term, delta_terms):
     shifting = shifting_to_next_day(runtime, previous, (date_, term))
     if shifting:
-        computer.concat_files_and_forget(shifting)
+        computer.concat_and_clean_computed_folder(shifting)
     computer.compute(date_, term)
     previous = (date_, term)

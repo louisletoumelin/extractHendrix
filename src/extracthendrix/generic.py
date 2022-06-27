@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from datetime import time, datetime, timedelta
 import time as timeutils
 from collections import defaultdict
+import glob
 
 import numpy as np
 import epygram
@@ -172,8 +173,6 @@ class AromeCacheManager:
         this way the cache manager wouldn't depend on the file's format
         """
 
-        # todo is this necessary? Why after getting resource
-
         # Check if file is already in cache
         filepath_in_cache = self.get_path_file_in_cache(date, term)
         if os.path.isfile(filepath_in_cache):
@@ -209,6 +208,9 @@ class AromeCacheManager:
         dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
         self.opened_files[filepath] = dataset
 
+    def forget_opened_files(self):
+        del self.opened_files
+
     def close_file(self, date, term):
         """Not used"""
         filepath = self.get_path_file_in_cache(date, term)
@@ -219,8 +221,8 @@ class AromeCacheManager:
     def read_cache(self, date, term, native_variables):
         # Check file in cache and download if necessary
         filepath_in_cache = self.get_path_file_in_cache(date, term)
-        file_not_in_cache = not os.path.isfile(filepath_in_cache)
-        if file_not_in_cache:
+        file_is_not_in_cache = not os.path.isfile(filepath_in_cache)
+        if file_is_not_in_cache:
             self.put_in_cache(date, term)
 
         # Return the file from cache
@@ -290,7 +292,8 @@ class ComputedValues:
             computed_vars=[],
             analysis_hour=None,
             autofetch_native=False,
-            members=[None]
+            members=[None],
+            model=None
     ):
         self.computed_vars = computed_vars  # i.e. variables given by the user (e.g. 'Tair' and not 'CLSTEMPERATURE)
         self.members = members
@@ -303,6 +306,7 @@ class ComputedValues:
         self.computed_files = defaultdict(lambda: [])
         self.folderLayout = folderLayout
         self.cache_managers = self._cache_managers(folderLayout, computed_vars, autofetch_native)
+        self.model = model
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):
         """
@@ -328,37 +332,53 @@ class ComputedValues:
             for member in self.members
         }
 
-    def get_path_file_in_final(self, time_tag, member):
-        filepath = self.folderLayout._final_
-        str_member = f"_mb{member:03d}" if member else ""
-        filename = f"final_{time_tag}_run_{self.analysis_hour}h{str_member}.nc"
-        return os.path.join(filepath, filename)
-
     @staticmethod
-    def delete_files_in_list_of_files(list_of_files):
+    def _delete_files_in_list_of_files(list_of_files):
         [os.remove(filename) for filename in list_of_files]
 
-    def save_final_netcdf(self, time_tag, member):
+    # old save_final_netcd
+    def _concat_files_and_save_netcdf(self, time_tag, member):
         ds = xr.open_mfdataset(self.computed_files[member], concat_dim='time')
         ds.to_netcdf(self.get_path_file_in_final(time_tag, member))
 
-    def concat_files_and_forget(self, time_tag):
+    def _delete_and_forget_computed_files(self, member):
+        if self.delete_computed_netcdf:
+            self._delete_files_in_list_of_files(self.computed_files[member])
+        del self.computed_files[member]
+
+    # old concat_files_and_forget
+    def concat_and_clean_computed_folder(self, time_tag):
         for member in self.members:
-            self.save_final_netcdf(time_tag, member)
-            if self.delete_computed_netcdf:
-                self.delete_files_in_list_of_files(self.computed_files[member])
-            del self.computed_files[member]
+            self._concat_files_and_save_netcdf(time_tag, member)
+            self._delete_and_forget_computed_files(member)
+
+    def delete_files_in_cache(self):
+        files = glob.glob(f'{self.folderLayout._cache_}/*')
+        for f in files:
+            os.remove(f)
+
+    def clean_cache_folder(self):
+        for cache_manager in self.cache_managers:
+            cache_manager.forget_opened_files()
+        self.delete_files_in_cache()
 
     # old get_file_hash
     def get_name_file_in_computed(self, date, term, member):
-        memberstr = f"_mb{member:03d}" if member else ""
-        filename = f"run_{date.strftime('%Y%m%d')}T{self.analysis_hour}-00-00Z-term_{term}h{memberstr}.nc"
+        member_str = f"_mb{member:03d}" if member else ""
+        filename = f"run_{date.strftime('%Y%m%d')}T{self.analysis_hour}-00-00Z-term_{term}h{member_str}.nc"
         return filename
 
     # old get_filepath
-    def get_path_file_in_computed(self, date, term, member):
+    def get_path_file_in_computed(self, date, term, member, domain):
         filepath = self.folderLayout._computed_
         filename = self.get_name_file_in_computed(date, term, member)
+        return os.path.join(filepath, filename)
+
+    def get_path_file_in_final(self, time_tag, member, domain):
+        filepath = self.folderLayout._final_
+        str_member = f"_mb{member:03d}" if member else ""
+        run_str = f"run_{self.analysis_hour}h"
+        filename = f"{self.model}_{domain}_{time_tag}_{run_str}{str_member}.nc"
         return os.path.join(filepath, filename)
 
     @staticmethod
@@ -385,25 +405,26 @@ class ComputedValues:
 
     def compute(self, date, term):
         for member in self.members:
+            for domain in self.domain:
 
-            # Skip if file is already computed
-            path_file_in_computed = self.get_path_file_in_computed(date, term, member)
-            file_already_computed = os.path.isfile(path_file_in_computed)
-            if file_already_computed:
-                self.computed_files[member].append(path_file_in_computed)
-                continue
+                # Look at files already computed
+                path_file_in_computed = self.get_path_file_in_computed(date, term, member)
+                file_is_already_computed = os.path.isfile(path_file_in_computed)
 
-            # Store computed values before saving to netcdf
-            variables_storage = defaultdict(lambda: [])
+                if file_is_already_computed:
+                    self.computed_files[member].append(path_file_in_computed)
+                else:
+                    # Store computed values before saving to netcdf
+                    variables_storage = defaultdict(lambda: [])
 
-            # Iterate on variables asked by the user (i.e. computed var)
-            for computed_var in self.computed_vars:
-                computed_values = self.compute_variables_in_cache(computed_var, member, date, term)
-                variables_storage[computed_var.name] = computed_values
-            variables_storage['time'] = validity_date(self.analysis_hour, date, term)
+                    # Iterate on variables asked by the user (i.e. computed var)
+                    for computed_var in self.computed_vars:
+                        computed_values = self.compute_variables_in_cache(computed_var, member, date, term)
+                        variables_storage[computed_var.name] = computed_values
+                    variables_storage['time'] = validity_date(self.analysis_hour, date, term)
 
-            # Create netcdf file of computed values
-            self.save_computed_vars_to_netcdf(path_file_in_computed, variables_storage)
+                    # Create netcdf file of computed values
+                    self.save_computed_vars_to_netcdf(path_file_in_computed, variables_storage)
 
-            # Remember that current file is computed
-            self.computed_files[member].append(path_file_in_computed)
+                    # Remember that current file is computed
+                    self.computed_files[member].append(path_file_in_computed)

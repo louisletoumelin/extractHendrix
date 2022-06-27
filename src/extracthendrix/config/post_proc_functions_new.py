@@ -18,6 +18,18 @@ def compute_temperature_in_degree_c(read_cache, date, term, native_variable):
     return read_cache(date, term, native_variable) - 273.15
 
 
+def compute_decumul(read_cache, date, term, native_variable):
+    """
+    convert absolute temperature to degrees C.
+    :param read_cache: read cache method from cache manager
+    :param date: analysis date
+    :param term: forecast term
+    :param native_variable: temperature in K
+    :return: temperature in degrees C
+    """
+    return read_cache(date, term, native_variable) - read_cache(date, term-1, native_variable)
+
+
 def compute_t_r_p2qv(read_cache, date, term, temperature, rh, pressure):
     """
     Calculate specific humidity (liquid phase only) from temperature, relative humidity and air pressure.
