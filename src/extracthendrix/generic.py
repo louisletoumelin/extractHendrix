@@ -428,16 +428,12 @@ class ComputedValues:
         date_str = datetime.now().strftime("%Y_%m_%d_%H")
         id_ = str(uuid.uuid1())[:5]
         filename = f"HendrixExtraction_{date_str}_ID_{id_}"
-        new_name = os.path.join(self.folderLayout, filename)
+        new_name = os.path.join(self.folderLayout.work_folder, filename)
         os.rename(self.folderLayout._final_, new_name)
 
     def clean_final_folder(self):
         self._move_files_to_domain_folders()
-        date_str = datetime.now().strftime("%Y_%m_%d_%H")
-        id_ = str(uuid.uuid1())[:5]
-        filename = f"HendrixExtraction_{date_str}_ID_{id_}"
-        new_name = os.path.join(self.folderLayout.work_folder, filename)
-        os.rename(self.folderLayout._final_, new_name)
+        self._rename_final_folder()
 
     def files_are_in_final(self, time_tag):
 
@@ -464,6 +460,28 @@ class ComputedValues:
         for cache_manager in self.cache_managers.values():
             # Delete .fa or .grib file after extraction of desired variables
             cache_manager.delete_native_files()
+
+    def make_surfex_compliant(self):
+        # Add necessary data for SURFEX
+        for file in os.listdir(self.folderLayout._final_):
+            filename = os.path.join(self.folderLayout._final_, file)
+            ds = xr.open_dataset(filename)
+            ds = ds.rename({"latitude": "LAT", "longitude": "LON"})
+            ds.attrs["FORC_TIME_STEP"] = 3600
+            xx = len(ds.xx)
+            yy = len(ds.yy)
+            time = len(ds.time)
+            ds["CO2air"] = (("time", "xx", "yy"), np.full((time, xx, yy), 0.00062))
+            if "Wind_DIR" not in ds:
+                ds["Wind_DIR"] = (("time", "xx", "yy"), np.zeros((time, xx, yy)))
+            ds["UREF"] = (("xx", "yy"), np.full((xx, yy), 10))
+            ds["ZREF"] = (("xx", "yy"), np.full((xx, yy), 2))
+            ds["slope"] = (("xx", "yy"), np.zeros((xx, yy)))
+            ds["aspect"] = (("xx", "yy"), np.zeros((xx, yy)))
+            ds["FRC_TIME_STP"] = 3600
+            ds.to_netcdf(filename.split(".nc")[0]+"_tmp.nc", unlimited_dims={"time": True})
+            os.remove(filename)
+            os.rename(filename.split(".nc")[0]+"_tmp.nc", filename)
 
     def compute(self, date, term):
         for member in self.members:

@@ -165,6 +165,7 @@ def execute(config_user):
 
     # Clean predictions
     layout.clean_layout()
+    computer.make_surfex_compliant()
     computer.clean_final_folder()
 
 
