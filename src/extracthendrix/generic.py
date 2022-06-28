@@ -1,4 +1,3 @@
-from datetime import timedelta
 import os
 import copy
 import logging
@@ -289,6 +288,23 @@ def dateiterator(date_start, date_end, first_term, last_term, delta_terms):
         current_date += timedelta(days=1)
 
 
+def dateiteratorforecast(runtime, date_start, date_end, first_term, last_term, delta_terms):
+    current_date = date_start
+    while current_date <= date_end:
+        current_term = first_term
+        while current_term <= last_term:
+            yield (datetime.combine(current_date, runtime), current_term)
+            current_term += delta_terms
+        current_date += timedelta(days=1)
+
+
+def dateiteratoranalysis(datetime_start, datetime_end, delta, term=None):
+    current_datetime = datetime_start
+    while current_datetime <= datetime_end:
+        yield (current_datetime, term)
+        current_datetime += timedelta(hours=delta)
+
+
 class ComputedValues:
     """
     calcule les valeurs finales pour chaque date_, term
@@ -301,7 +317,7 @@ class ComputedValues:
             delete_computed_netcdf=True,
             domain=None,
             computed_vars=[],
-            analysis_hour=None,
+            analysis_hour=None, #TODO remove analysis_hour in instanciation 
             autofetch_native=False,
             members=[None],
             model=None
@@ -495,7 +511,7 @@ class ComputedValues:
             os.remove(filename)
             os.rename(filename.split(".nc")[0]+"_tmp.nc", filename)
 
-    def compute(self, date, term):
+    def compute(self, date, term): # compute(self, datetimerun_, term)
         for member in self.members:
             for domain in self.domain:
 
