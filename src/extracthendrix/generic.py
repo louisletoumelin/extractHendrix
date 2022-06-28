@@ -26,7 +26,7 @@ logger.setLevel(logging.DEBUG)
 
 class FolderLayout:
     """
-    Creates directory where files are stored
+    Creates a folder and four temporary subfolders where files are stored.
 
     :param work_folder: Path to main folder where extraction is done
     :type work_folder: str
@@ -34,10 +34,10 @@ class FolderLayout:
 
     def __init__(self, work_folder):
         self.work_folder = work_folder
-        self._create_layout()
+        self.create_layout()
 
     @staticmethod
-    def _create_folder_if_doesnt_exist(path):
+    def create_folder_if_doesnt_exist(path):
         """Create a folder if it doesn't already exists
 
         :param path: Folder path
@@ -48,7 +48,7 @@ class FolderLayout:
         except FileExistsError:
             print(f"Folder {path} already exists")
 
-    def _create_layout(self):
+    def create_layout(self):
         """
         Creates folder and subfolders for the current extraction
 
@@ -59,48 +59,69 @@ class FolderLayout:
         │   ├── _final_
         """
         # Parent folder
-        self._create_folder_if_doesnt_exist(self.work_folder)
+        self.create_folder_if_doesnt_exist(self.work_folder)
 
         # Subfolders
         for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
             setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
-            self._create_folder_if_doesnt_exist(getattr(self, subfolder))
+            self.create_folder_if_doesnt_exist(getattr(self, subfolder))
 
     def clean_layout(self):
+        """Removes subfolders in work_folder"""
         for subfolder in ['_native_', '_cache_', '_computed_']:
             shutil.rmtree(getattr(self, subfolder))
 
 
 class AromeCacheManager:
-
+    """
+    A class that deals with data in cache and eventually triggers downloading.
+    """
     def __init__(
             self,
             folderLayout,
             domain=None,
-            variables=[],
+            native_variables=[],
             model=None,
             delete_native=True,
             member=None,
             autofetch_native=False
     ):
+        """
+        :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
+        :param domain: List of geographical domains (e.g. ["alps", "pyr"])
+        :type domain: list
+        :param native_variables: list of model native variables
+        :type native_variables: list
+        :param model: Model name
+        :type model: str
+        :param delete_native: Delete native files when creating cache if finished.
+        :type delete_native: Bool
+        :param member: Member number
+        :type member: int
+        :param autofetch_native: Raises an exception if False, for testing purposes, because extraction on Hendrix
+        is slow
+        :type autofetch_native: Bool
+        """
         self.folderLayout = folderLayout
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(folderLayout, model, member)
         self.domain = domain
-        self.variables = variables
+        self.variables = native_variables
         self.autofetch_native = autofetch_native
         self.opened_files = {}
 
     # old get_cache_path
     def get_path_file_in_cache(self, date, term, domain):
         """
-        Return full path to file in cache for a given run time and forecast lead time
+        Return full path to file in cache for a given run and forecast lead time.
 
         :param date: Run time
         :type date: datetime
         :param term: forecast leadtime
         :type term: int
+        :param domain: Model name
+        :type domain: str
         :return: str
         """
         filename = self.extractor.get_file_hash(date, term)
@@ -109,7 +130,12 @@ class AromeCacheManager:
         return os.path.join(folder, filename)
 
     def extract_subgrid(self, field, domain):
-        """Extract pixels of an Epygram field corresponding to a user defined domain"""
+        """
+        Extract pixels of an Epygram field corresponding to a user defined domain
+
+        :param field: Epygram field
+        :param domain: Geographical domain name
+        """
         domain_description = domains_descriptions[domain]
         if self.extractor.model_name not in ['AROME', 'AROME_SURFACE']:
             i1, j1 = np.round(field.geometry.ll2ij(domain_description['lon_llc'], domain_description['lat_llc'])) + 1
@@ -125,7 +151,13 @@ class AromeCacheManager:
 
     @staticmethod
     def read_field_or_alternate_name(input_resource, variable):
-        """Reads an Epygram field (=variable). Uses alternative name if original names are not found in the file"""
+        """
+        Reads an Epygram field (=variable). Uses alternative name if original names are not found in the file
+
+        :param input_resource: Epygram/Vortex resource
+        :param variable: native variable name
+        :return: Epygram field
+        """
         initial_name = variable
 
         try:
@@ -152,7 +184,13 @@ class AromeCacheManager:
 
     @staticmethod
     def pass_metadata_to_netcdf(field, outname=None):
-        """Pass metadata from fa file to netcdf file"""
+        """
+        Pass metadata from fa file to netcdf file
+
+        :param field: Epygram field
+        :param outname: output name
+        :return: Epygram field
+        """
         if outname:
             field.fid['netCDF'] = outname
             return field
@@ -164,18 +202,29 @@ class AromeCacheManager:
             return field
 
     def get_native_resource_if_necessary(self, date, term):
+        """
+        Triggers extractor and download on hendrix only if necessary
+
+        :param date: current date
+        :param term: forecast lead time
+        :return: path of the native file, Epygram resource
+        """
         native_file_path = self.extractor.get_native_file(date, term, autofetch=self.autofetch_native)
         input_resource = epygram.formats.resource(native_file_path, 'r', fmt=self.extractor.fmt.upper())
         return native_file_path, input_resource
 
     def put_in_cache(self, date, term, domain):
         """
-        Builds a single netcdf file corresponding to a single fa or grib file.
+        Creates a netcdf file for each forecast lead time or analysis date,
+        with only the requested variables on a subdomain.
 
-        :param term: forecast leadtime
-        :type term: int
+        This permits to store intermediate data and to easily relaunch extraction if necessary.
+
+        :param date: Run date
+        :param term: Forecast leadtime
+        :param domain: Geographical domain name
         # TODO: would be nice if hendrix reader could return each variable in a fixed format,
-        this way the cache manager wouldn't depend on the file's format
+        #this way the cache manager wouldn't depend on the file's format
         """
 
         # Check if file is already in cache
@@ -183,7 +232,7 @@ class AromeCacheManager:
         if os.path.isfile(filepath_in_cache):
             return
 
-        # Open Epygram resource
+        # Initialize netcdf file
         output_resource = epygram.formats.resource(filepath_in_cache, 'w', fmt='netCDF')
         output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
 
@@ -191,7 +240,7 @@ class AromeCacheManager:
         native_file_path, input_resource = self.get_native_resource_if_necessary(date, term)
 
         # Extract variable from native file (i.e. .fa or .grib)
-        for variable in self.variables:
+        for variable in self.native_variables:
             field = self.read_field_or_alternate_name(input_resource, variable)
             field = self.pass_metadata_to_netcdf(field, variable.outname)
             if field.spectral:
@@ -201,15 +250,28 @@ class AromeCacheManager:
         logger.debug(f" .fa or .grib file converted to netcdf for date {date} and term {term}\n\n")
 
     def get_file_in_cache(self, filepath):
+        """
+        Returns data in cache as a xarray dataset.
+        Store previously opened dataset in order to prevent opening several times the same file.
+
+        :param filepath: Path to file
+        :return: xarray dataset
+        """
         if filepath not in self.opened_files:
             self.open_and_store_file(filepath)
         return self.opened_files[filepath]
 
     def open_and_store_file(self, filepath):
+        """
+        Open netcdf file in cache folder as a xarray dataset.
+
+        :param filepath: Path to file
+        """
         dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
         self.opened_files[filepath] = dataset
 
     def forget_opened_files(self):
+        """Reinitialize dictionary that stored opened netcdf files in cache to release RAM."""
         self.opened_files = {}
 
     def close_file(self, date, term, domain):
@@ -220,13 +282,22 @@ class AromeCacheManager:
         del self.opened_files[filepath]
 
     def delete_native_files(self):
-        """Delete .fa or .grib file after extraction of desired variables"""
+        """Delete .fa or .grib files (i.e. native files) after extraction of desired variables"""
         if self.delete_native:
             files = glob.glob(f'{self.folderLayout._native_}/*')
             for f in files:
                 os.remove(f)
 
     def read_cache(self, date, term, domain, native_variables):
+        """
+        Read data in cache folder if available, or download it instead.
+
+        :param date: Run date
+        :param term: Forecast lead time
+        :param domain: Geographical domain
+        :param native_variables: Name of native variable to read
+        :return: Data as a xarray dataset
+        """
         # Check file in cache and download if necessary
         filepath_in_cache = self.get_path_file_in_cache(date, term, domain)
         file_is_not_in_cache = not os.path.isfile(filepath_in_cache)
@@ -239,12 +310,18 @@ class AromeCacheManager:
 
 
 def get_model_names(computed_vars):
+    """
+    Returns models names associate with native variables (e.g. "AROME", "AROME_SURFACE"...)
+    :param computed_vars: Name of computed variable (e.g. "Tair" and not "CLSTEMPERATURE" for 2m temperature)
+    :return: Dictionary with model names
+    """
     return {ivar.model_name for var in computed_vars for ivar in var.native_vars}
 
 
 def sort_native_vars_by_model(computed_vars):
     """
-    get all native variables sorted by model
+    Get all native variables sorted by model.
+
     :return: a dict with keys=model names and values a list of variables to get from that model.
     Depending on the file format that might be strings with FA names or dicts with grib keys.
     :rtype: dict
@@ -281,7 +358,7 @@ def validity_date(date_, term):
 
 class ComputedValues:
     """
-    calcule les valeurs finales pour chaque date_, term
+    Compute variables in cache and store computed values in netcdf format.
     """
 
     def __init__(
@@ -290,11 +367,22 @@ class ComputedValues:
             delete_native=True,
             delete_computed_netcdf=True,
             domain=None,
-            computed_vars=[], #run=None,  # TODO remove run in instanciation
+            computed_vars=[],
             autofetch_native=False,
             members=[None],
             model=None
     ):
+        """
+        :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
+        :param delete_native: Delete native files when creating cache if finished.
+        :param delete_computed_netcdf: Delete computed netcdf files in _computed_ folder when computation is finished.
+        :param domain: Geographical domain name.
+        :param computed_vars: Name of computed variables (e.g. "Tair" and not "CLSTEMPERATURE")
+        :param autofetch_native: Raises an exception if False, for testing purposes, because extraction on Hendrix
+        is slow.
+        :param members: Member number?
+        :param model: Model name.
+        """
         self.computed_vars = self.str2attrs(model, computed_vars)
         self.members = members
         self.domain = domain
@@ -308,7 +396,14 @@ class ComputedValues:
         self.model = model
 
     @staticmethod
-    def str2attrs(model, variables):
+    def str2attrs(model, computed_variables):
+        """
+        Link a model name to the object containing information about the model variables.
+
+        :param model: Model name.
+        :param variables: Computed variables names (e.g. "Tair" and not "CLSTEMPERATURE").
+        :return: List of model variables.
+        """
         if model == "AROME":
             model_vars = arome
         elif model == "PEAROME":
@@ -319,17 +414,17 @@ class ComputedValues:
             model_vars = arpege
         else:
             raise NotImplementedError(f"{model} is not implemented. Current model available are:"
-                                      f"'AROME' and 'PEAROME'")
-        return [getattr(model_vars, variable) for variable in variables]
+                                      f"'AROME', 'PEAROME', 'ARPEGE'")
+        return [getattr(model_vars, variable) for variable in computed_variables]
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):
         """
         Creates a dictionary that contains "cache managers" for each model and member extracted
 
-        :param folderLayout:
-        :param computed_vars:
-        :param autofetch_native:
-        :return:
+        :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
+        :param computed_vars: Name of computed variable (e.g. "Tair" and not "CLSTEMPERATURE" for 2m temperature)
+        :param autofetch_native: Raises an exception if False, for testing purposes, because extraction on Hendrix
+        :return: Dictionary containing cache managers
         """
         return {
             (model_name, member): AromeCacheManager(
@@ -347,10 +442,22 @@ class ComputedValues:
 
     @staticmethod
     def _delete_files_in_list_of_files(list_of_files):
+        """
+        Deletes files given paths of the files
+
+        :param list_of_files: List of path to files
+        """
         [os.remove(filename) for filename in list_of_files]
 
     # old save_final_netcd
     def _concat_files_and_save_netcdf(self, time_tag, member, domain):
+        """
+        Save computed files to netcdf in _computed_ folder.
+
+        :param time_tag: Runtime.
+        :param member: Member number.
+        :param domain: Geographical domain name.
+        """
         if self.computed_files[(member, domain)]:
             ds = xr.open_mfdataset(self.computed_files[(member, domain)], concat_dim='time')
             ds.to_netcdf(self.get_path_file_in_final(time_tag, member, domain))
@@ -358,6 +465,12 @@ class ComputedValues:
             print(f"self.computed_files[(member, domain)] is empty")
 
     def _delete_and_forget_computed_files(self, member, domain):
+        """
+        Reinitialize list that stored opened netcdf files in cache to release RAM.
+
+        :param member: Member number.
+        :param domain: Geographical domain name.
+        """
         if self.delete_computed_netcdf:
             self._delete_files_in_list_of_files(self.computed_files[(member, domain)])
         if self.computed_files[(member, domain)]:
@@ -365,23 +478,43 @@ class ComputedValues:
 
     # old concat_files_and_forget
     def concat_and_clean_computed_folder(self, time_tag):
+        """
+        Concat files that forms a group of computed files as specified by the user (e.g. daily, monthly...).
+
+        Delete files in the _computed_ folder (they are now in grouped in the _final_ folder)
+        and release RAM from opened file.
+
+        :param time_tag: Run time
+        """
         for member in self.members:
             for domain in self.domain:
                 self._concat_files_and_save_netcdf(time_tag, member, domain)
                 self._delete_and_forget_computed_files(member, domain)
 
     def delete_files_in_cache(self):
+        """Delete files in _cache_ folder"""
         files = glob.glob(f'{self.folderLayout._cache_}/*')
         for f in files:
             os.remove(f)
 
     def clean_cache_folder(self):
+        """Reinitialize dictionaries that stored opened netcdf files in cache to release RAM and delete files
+        in _cache_ folder"""
         for cache_manager in self.cache_managers.values():
             cache_manager.forget_opened_files()
         self.delete_files_in_cache()
 
     # old get_file_hash
     def get_name_file_in_computed(self, date, term, member, domain):
+        """
+        Get name of current file in _computed_ folder.
+
+        :param date: Run date.
+        :param term: Forecast lead time.
+        :param member: Member number.
+        :param domain: Geographical domain.
+        :return: filename
+        """
         date_str = f"date_{date.strftime('%Y%m%d%H')}"
         term_str = f"_term_{term}" if term is not None else ""
         member_str = f"_mb{member:03d}" if member else ""

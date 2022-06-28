@@ -186,27 +186,15 @@ def execute(config_user):
 
     previous_date = (c.get("start_date"), c.get("start_term"))
     for date_, term in iterator.get_iterator():
-        print("\ndebug0")
-        print(date_)
         current_date = (date_, term)
         time_tag = grouper.filetag(*previous_date)
 
         # Look if all files (all members and all domains) are already in final folder
         if computer.files_are_in_final(time_tag):
             continue
-            print("\ndebug1")
-            print("computer.files_are_in_final(time_tag)")
         else:
-            print("\ndebug1")
-            print("NOT computer.files_are_in_final(time_tag)")
-
-            print("\ndebug2")
-            print(previous_date)
-            print(current_date)
 
             if grouper.batch_is_complete(previous_date, current_date):
-                print("debug3")
-                print("grouper.batch_is_complete(previous_date, current_date)")
                 computer.concat_and_clean_computed_folder(time_tag)
                 computer.clean_cache_folder()
 
