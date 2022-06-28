@@ -32,10 +32,10 @@ date_start = datetime(2020, 6, 1),
 date_end = datetime(2020, 6, 30),
 
 # Analysis hour
-analysis_hour = 0,
+run = 0,
 
 # Delta between terms
-delta_terms = 1,
+delta_t = 1,
 
 # Term in hour after analysis
 start_term = 6, # Default: 6

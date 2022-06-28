@@ -40,7 +40,7 @@ def test_put_in_cache_pearome(helpers):
     helpers.symlink_files(test_data_folder, test_folder, 'pearome', '_native_')
     date_, term = date(2020, 3, 1), 1
     domain = 'alp'
-    analysis_hour = 3
+    run = 3
     variables = [
         peg.t2m, peg.t2m, peg.r2m, peg.pres0m, peg.u10m, peg.v10m,
         peg.u10m, peg.v10m, peg.pres0m
@@ -50,7 +50,7 @@ def test_put_in_cache_pearome(helpers):
         variables=variables,
         folderLayout=folderLayout,
         model='PEAROME',
-        runtime=time(hour=analysis_hour),
+        run=time(hour=run),
         delete_native=False,
         member=2
     )
@@ -63,7 +63,7 @@ def test_read_cache_pearome(helpers):
     helpers.symlink_files(test_data_folder, test_folder, 'pearome', '_cache_')
     date_, term = date(2020, 3, 1), 1
     domain = 'alp'
-    analysis_hour = 3
+    run = 3
     variables = [
         peg.t2m, peg.t2m, peg.r2m, peg.pres0m, peg.u10m, peg.v10m,
         peg.u10m, peg.v10m, peg.pres0m
@@ -73,7 +73,7 @@ def test_read_cache_pearome(helpers):
         variables=variables,
         folderLayout=folderLayout,
         model='PEAROME',
-        runtime=time(hour=analysis_hour),
+        run=time(hour=run),
         delete_native=False,
         member=2
     )

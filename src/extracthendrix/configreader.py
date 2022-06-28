@@ -3,7 +3,7 @@ import functools
 import time as timeutils
 import os
 
-from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, dateiterator, get_model_names
+from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
 
@@ -61,32 +61,30 @@ class Grouper:
     def __init__(self, groupby):
         self.groupby = groupby
 
-    def filetag(self, runtime, date_, term):
+    def filetag(self, run, term):
         """
         Gives a tag (str) of the date for which the extraction is valid.
         e.g. "2020-09-5"
 
-        :param runtime: hour of the run
-        :type runtime: int
-        :param date_: date of the run
-        :type date_: datetime
+        :param run: date of the run
+        :type run: datetime
         :param term: hour of the term
         :type term: int
         :return: str
         """
         if self.groupby == ('timeseries', 'daily'):
-            return validity_date(runtime, date_, term).strftime("%Y-%m-%d")
+            return validity_date(run, term).strftime("%Y_%m_%d")
         if self.groupby == ('timeseries', 'monthly'):
-            return validity_date(runtime, date_, term).strftime("%Y-%m")
+            return validity_date(run, term).strftime("%Y_%m")
         if self.groupby == ('forecast',):
-            return validity_date(runtime, date_, 0).strftime("%Y-%m-%d")
+            return validity_date(run, 0).strftime("%Y_%m_%d")
 
-    def batch_is_complete(self, runtime, previous, current):
+    def batch_is_complete(self, previous, current):
         """Detect when next day/month is extracted"""
         if self.groupby == ('timeseries', 'daily'):
-            return validity_date(runtime, *previous).day != validity_date(runtime, *current).day
+            return validity_date(*previous).day != validity_date(*current).day
         if self.groupby == ('timeseries', 'monthly'):
-            return validity_date(runtime, *previous).month != validity_date(runtime, *current).month
+            return validity_date(*previous).month != validity_date(*current).month
         if self.groupby == ('forecast',):
             return previous[0] != current[0]
 
@@ -96,15 +94,66 @@ class DictNamespace:
     def __init__(self, dict_):
         self.__dict__ = dict_
 
+    def get(self, key):
+        return self.__dict__.get(key)
+
+
+class TimeIterator:
+    def __init__(self, config_user):
+        self.model = config_user.get("model")
+        self.run = config_user.get("run")
+        self.start_date = config_user.get("start_date")
+        self.end_date = config_user.get("end_date")
+        self.start_term = config_user.get("start_term")
+        self.end_term = config_user.get("end_term")
+        self.delta_t = config_user.get("delta_t")
+        self.term = config_user.get("term")
+
+        assert isinstance(self.start_date, datetime)
+        assert isinstance(self.end_date, datetime)
+
+    def dateiterator(self):
+        current_date = self.start_date
+        while current_date <= self.end_date:
+            current_term = self.start_term
+            while current_term <= self.end_term:
+                yield (current_date, current_term)
+                current_term += self.delta_t
+            current_date += timedelta(days=1)
+
+    def dateiteratorforecast(self):
+        current_date = self.start_date
+        while current_date <= self.end_date:
+            current_term = self.start_term
+            while current_term <= self.end_term:
+                yield (datetime.combine(current_date, time(hour=self.run)), current_term)
+                current_term += self.delta_t
+            current_date += timedelta(days=1)
+
+    def dateiteratoranalysis(self):
+        current_datetime = self.start_date
+        while current_datetime <= self.end_date:
+            yield (current_datetime, self.term)
+            current_datetime += timedelta(hours=self.delta_t)
+
+    def get_iterator(self):
+        if "analysis" in self.model:
+            return self.dateiteratoranalysis()
+        else:
+            return self.dateiteratorforecast()
+
 
 def check_config_user(config_user):
+
     assert config_user["start_date"] <= config_user["end_date"], "Start date must be before or equal to end date"
 
     if not isinstance(config_user["domain"], list):
         config_user["domain"] = list(config_user["domain"])
     assert isinstance(config_user["domain"], list)
 
-    if config_user["groupby"][0] == 'timeseries':
+    group_results_as_time_series = config_user["groupby"][0] == 'timeseries'
+    model_is_in_forecast_mode = not "analysis" in config_user["model"]
+    if group_results_as_time_series and model_is_in_forecast_mode:
         str_raise = "In mode time series, between duration between terms must be 24h"
         assert config_user["end_term"] - config_user["start_term"] == 24, str_raise
 
@@ -129,31 +178,46 @@ def execute(config_user):
         layout,
         domain=c.domain,
         computed_vars=c.variables,
-        analysis_hour=c.analysis_hour,
         autofetch_native=True,
         model=c.model)
 
-    previous = (c.start_date, c.start_term)
-    for date_, term in dateiterator(c.start_date, c.end_date, c.start_term, c.end_term, c.delta_terms):
+    # Time iterator
+    iterator = TimeIterator(config_user)
 
-        time_tag = grouper.filetag(c.analysis_hour, *previous)
+    previous_date = (c.get("start_date"), c.get("start_term"))
+    for date_, term in iterator.get_iterator():
+        print("\ndebug0")
+        print(date_)
+        current_date = (date_, term)
+        time_tag = grouper.filetag(*previous_date)
 
         # Look if all files (all members and all domains) are already in final folder
         if computer.files_are_in_final(time_tag):
             continue
+            print("\ndebug1")
+            print("computer.files_are_in_final(time_tag)")
         else:
-            if grouper.batch_is_complete(c.analysis_hour, previous, (date_, term)):
+            print("\ndebug1")
+            print("NOT computer.files_are_in_final(time_tag)")
+
+            print("\ndebug2")
+            print(previous_date)
+            print(current_date)
+
+            if grouper.batch_is_complete(previous_date, current_date):
+                print("debug3")
+                print("grouper.batch_is_complete(previous_date, current_date)")
                 computer.concat_and_clean_computed_folder(time_tag)
                 computer.clean_cache_folder()
 
             retry_and_finally_raise(
                 onRetry=send_problem_extraction_email(config_user),
                 onFailure=send_script_stopped_email(config_user)
-            )(computer.compute)(date_, term)
+            )(computer.compute)(*current_date)
 
-            previous = (date_, term)
+            previous_date = (date_, term)
 
-    last_time_tag = grouper.filetag(c.analysis_hour, *previous)
+    last_time_tag = grouper.filetag(*previous_date)
     computer.concat_and_clean_computed_folder(last_time_tag)
     computer.clean_cache_folder()
 
@@ -174,19 +238,11 @@ def get_prestaging_file_list(config_user):
     model_names = get_model_names(c.variables)
     listfiles = []
     notfound = []
+    iterator = TimeIterator(config_user)
+
     for model_name in model_names:
-        reader = AromeHendrixReader(
-            model=model_name,
-            runtime=time(hour=c.analysis_hour),
-            getmode='locate'
-        )
-        model_list_files, model_not_found = reader.get_file_list(
-            dateiterator(
-                c.start_date, c.end_date,
-                c.start_term, c.end_term,
-                c.delta_terms
-            )
-        )
+        reader = AromeHendrixReader(model=model_name, getmode='locate')
+        model_list_files, model_not_found = reader.get_file_list(iterator.get_iterator())
         listfiles += model_list_files
         notfound += model_not_found
     return listfiles, notfound

@@ -29,13 +29,13 @@ password = getpass.getpass("Password: ")
 ftp.login(login, password)
 
 
-def get_prestaging_file_list(ftpconnection, dateterm_iterator, model_name, runtime):
+def get_prestaging_file_list(ftpconnection, dateterm_iterator, model_name, run):
     ftp = ftpconnection
     filelist = []
     notfound = []
     reader = AromeHendrixReader(
         model=model_name,
-        runtime=runtime
+        run=run
     )
     for date_, term in dateterm_iterator:
         resdesc = reader._get_vortex_resource_description(date_, term)

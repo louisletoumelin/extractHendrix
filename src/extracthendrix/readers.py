@@ -50,6 +50,7 @@ def model_ini_to_dict(model_name):
     dict_model = dict(config[model_name])
     return dict_model
 
+
 #  old get_model_description
 def get_all_resource_descriptions(model_name, member=None):
     """Get vortex description of a model"""
@@ -85,36 +86,36 @@ class HendrixFileReader:
 
 available_combinations = [
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=3)],
+         run=[time(hour=3)],
          previ=[False],
          member=range(37),
          timerange=zip([timedelta(days=-i) for i in range(2, 5)], [timedelta(days=-i) for i in range(1, 4)])),
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=3)],
+         run=[time(hour=3)],
          previ=[True],
          member=range(37),
          timerange=[(timedelta(days=-1), timedelta(days=4))]
          ),
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=6)],
+         run=[time(hour=6)],
          previ=[False],
          member=range(37),
          timerange=[(timedelta(days=-1), timedelta(days=0))]
          ),
     dict(model=['S2M_PRO'],
-         runtime=[time(hour=6)],
+         run=[time(hour=6)],
          previ=[True],
          member=range(37),
          timerange=[(timedelta(days=0), timedelta(days=4))]
          ),
     dict(model=['S2M_PRO'],
-         runtime=[time(hour=9)],
+         run=[time(hour=9)],
          previ=[True],
          member=range(37),
          timerange=[(timedelta(days=0), timedelta(days=4))]
          ),
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=9)],
+         run=[time(hour=9)],
          previ=[False],
          member=range(37),
          timerange=[(timedelta(days=-1), timedelta(days=0))]
@@ -122,9 +123,9 @@ available_combinations = [
 ]
 available_single_combinations = []
 for combination in available_combinations:
-    for (model, runtime, previ, member, timerange) in itertools.product(
+    for (model, run, previ, member, timerange) in itertools.product(
         combination['model'],
-        combination['runtime'],
+        combination['run'],
         combination['previ'],
         combination['member'],
         combination['timerange']
@@ -133,7 +134,7 @@ for combination in available_combinations:
             available_single_combinations.append(
                 dict(
                     model=model,
-                    runtime=runtime,
+                    run=run,
                     previ=previ,
                     member=member,
                     geometry=geometry,
@@ -150,7 +151,7 @@ class S2MArgHelper:
 
     def checkargs(self, kwargs):
         for key in kwargs.keys():
-            if key not in ('model', 'runtime', 'previ', 'member', 'geometry'):
+            if key not in ('model', 'run', 'previ', 'member', 'geometry'):
                 raise ValueError("Clé illégale pour les arguments de S2M")
 
     def add_arg(self, **kwargs):
@@ -194,7 +195,7 @@ class S2MArgHelper:
         """
         run = self.get_params_for_run(term=term)
         rundatetime = datetime.combine(
-            date=date, time=self.s2m_args['runtime'])
+            date=date, time=self.s2m_args['run'])
         datebegin = rundatetime.replace(hour=6) + run['begin']
         dateend = rundatetime.replace(hour=6) + run['end']
         params = dict(
@@ -205,7 +206,7 @@ class S2MArgHelper:
         )
         del params['end']
         del params['begin']
-        del params['runtime']
+        del params['run']
         return params
 
 
@@ -294,13 +295,11 @@ class AromeHendrixReader(HendrixFileReader):
     def __init__(self,
                  folderLayout=None,
                  model=None,
-                 runtime=None,
                  member=None,
                  getmode='get',
                  ):
         self.folderLayout = folderLayout
         self.getmode = getmode
-        self.runtime = runtime
         self.model_name = model
         self.member = member
         # List with all model descriptions possibles (including alternative parameters such as "namespace")
@@ -308,14 +307,10 @@ class AromeHendrixReader(HendrixFileReader):
         self.fmt = self.list_resource_descriptions[0]['nativefmt']  # FA or GRIB
 
     def get_file_hash(self, date, term):
-        hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}".format(
-            model=self.model_name,
-            date=date.strftime("%Y%m%d"),
-            runtime=self.runtime.strftime("%H"),
-            term=term,
-            memberstr="_mb{member:03d}".format(
-                member=self.member) if self.member else ""
-        )
+        date = date.strftime("%Y%m%d%H")
+        memberstr = f"_mb{self.member:03d}" if self.member else ""
+        term = f"_term{term}" if term is not None else ""
+        hash_ = f"{self.model_name}_run_{date}{term}{memberstr}"
         return hash_
 
     def get_file_list(self, dateandtermiterator):
@@ -343,7 +338,7 @@ class AromeHendrixReader(HendrixFileReader):
     def _get_vortex_resource_description(self, date, term):
         resource_descriptions = [dict(
             **model_description,
-            date=datetime.combine(date=date, time=self.runtime),
+            date=date,
             term=term
         ) for model_description in self.list_resource_descriptions]
 
@@ -358,7 +353,7 @@ class AromeHendrixReader(HendrixFileReader):
         """
         Download files on Hendrix if necessary.
 
-        :param date: runtime
+        :param date: run
         :param term: forecast lead time
         :param autofetch:
         :return: filepath, str

@@ -14,7 +14,7 @@ native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
 # hc.get_resource_from_hendrix(3)
 
 arome_extr = AromeHendrixReader(
-    native_files_folder=native_files_folder, model='AROME', runtime=time(0))
+    native_files_folder=native_files_folder, model='AROME', run=time(0))
 # arome_extr.list_model_descriptions = arome_extr.list_model_descriptions[0:1]
 
 _date = date(2022, 4, 6)
@@ -31,7 +31,7 @@ params
 
 
 # helper = S2MArgHelper(model='S2M_PRO', member=36,
-#                       runtime=time(hour=3), geometry='cor')
+#                       run=time(hour=3), geometry='cor')
 # s2m_extr = S2MExtractor(native_files_folder=native_files_folder,
 #                         cache_folder='/home/merzisenh/CACHE/netcdf/',
 #                         s2mArgHelper=helper)

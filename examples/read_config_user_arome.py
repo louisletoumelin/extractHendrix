@@ -12,8 +12,8 @@ config_user = dict(
     start_date=datetime(2022, 6, 21),
     end_date=datetime(2022, 6, 23),
     groupby=('timeseries', 'daily'),
-    analysis_hour=0,
-    delta_terms=6,
+    run=0,
+    delta_t=6,
     start_term=6,
     end_term=30
 )
@@ -36,3 +36,6 @@ execute(config_user)
 #     current_time=datetime(2022, 2, 2, 2),
 #     exception = Exception('PAF')
 #     )
+
+
+

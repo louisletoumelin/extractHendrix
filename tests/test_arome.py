@@ -32,7 +32,7 @@ def test_read_arome():
 def test_put_in_cache_arome(helpers):
     helpers.symlink_files(test_data_folder, test_folder, 'arome', '_native_')
     domain = 'alp'
-    analysis_hour = 3
+    run = 3
     date_, term = date(2022, 6, 17), 1
     variables = [an.CLSTEMPERATURE, an.S090TEMPERATURE,
                  an.CLSVENT__ZONAL, an.CLSVENT__MERIDIEN, an.SURFTEMPERATURE]
@@ -41,7 +41,7 @@ def test_put_in_cache_arome(helpers):
         variables=variables,
         folderLayout=folderLayout,
         model='AROME',
-        runtime=time(hour=analysis_hour),
+        run=time(hour=run),
         delete_native=False,
         autofetch_native=False
     )
@@ -53,7 +53,7 @@ def test_put_in_cache_arome(helpers):
 def test_put_in_cache_arome_no_native_file_no_autofetch(helpers):
     helpers.symlink_files(test_data_folder, test_folder, 'arome', '_native_')
     domain = 'alp'
-    analysis_hour = 3
+    run = 3
     # this term is not in the testing data so we're supposed to raise an exception
     date_, term = date(2022, 6, 17), 3
     variables = [an.CLSTEMPERATURE, an.S090TEMPERATURE,
@@ -63,7 +63,7 @@ def test_put_in_cache_arome_no_native_file_no_autofetch(helpers):
         variables=variables,
         folderLayout=folderLayout,
         model='AROME',
-        runtime=time(hour=analysis_hour),
+        run=time(hour=run),
         delete_native=False,
         autofetch_native=False
     )

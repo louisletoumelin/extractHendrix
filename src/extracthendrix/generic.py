@@ -18,7 +18,7 @@ from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.config.config_fa_or_grib2nc import alternatives_names_fa
 from extracthendrix.exceptions import CanNotReadEpygramField
-from extracthendrix.config.variables import arome, pearome
+from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -79,7 +79,6 @@ class AromeCacheManager:
             domain=None,
             variables=[],
             model=None,
-            runtime=None,
             delete_native=True,
             member=None,
             autofetch_native=False
@@ -87,10 +86,9 @@ class AromeCacheManager:
         self.folderLayout = folderLayout
         self.delete_native = delete_native
         self.coordinates = ['latitude', 'longitude']
-        self.extractor = AromeHendrixReader(folderLayout, model, runtime, member)
+        self.extractor = AromeHendrixReader(folderLayout, model, member)
         self.domain = domain
         self.variables = variables
-        self.runtime = runtime
         self.autofetch_native = autofetch_native
         self.opened_files = {}
 
@@ -214,7 +212,7 @@ class AromeCacheManager:
     def forget_opened_files(self):
         self.opened_files = {}
 
-    def close_file(self, date, term):
+    def close_file(self, date, term, domain):
         """Not used"""
         filepath = self.get_path_file_in_cache(date, term, domain)
         file = self.opened_files[filepath]
@@ -263,46 +261,22 @@ def sort_native_vars_by_model(computed_vars):
     }
 
 
-def validity_date(runtime, date_, term):
+def validity_date(date_, term):
     """
-    Compute the validity date of a run given runtime and term
+    Compute the validity date of a run given run and term
 
-    :param runtime: Runtime
-    :type runtime: Float
+    :param run: run
+    :type run: Float
     :param date_: Run time day
     :type date_: datetime
     :param term: Term
     :type term: Float
     :return: datetime
     """
-    return datetime.combine(date_, time(hour=runtime)) + timedelta(hours=term)
-
-
-def dateiterator(date_start, date_end, first_term, last_term, delta_terms):
-    current_date = date_start
-    while current_date <= date_end:
-        current_term = first_term
-        while current_term <= last_term:
-            yield (current_date, current_term)
-            current_term += delta_terms
-        current_date += timedelta(days=1)
-
-
-def dateiteratorforecast(runtime, date_start, date_end, first_term, last_term, delta_terms):
-    current_date = date_start
-    while current_date <= date_end:
-        current_term = first_term
-        while current_term <= last_term:
-            yield (datetime.combine(current_date, runtime), current_term)
-            current_term += delta_terms
-        current_date += timedelta(days=1)
-
-
-def dateiteratoranalysis(datetime_start, datetime_end, delta, term=None):
-    current_datetime = datetime_start
-    while current_datetime <= datetime_end:
-        yield (current_datetime, term)
-        current_datetime += timedelta(hours=delta)
+    if term is None:
+        return date_
+    else:
+        return date_ + timedelta(hours=term)
 
 
 class ComputedValues:
@@ -316,8 +290,7 @@ class ComputedValues:
             delete_native=True,
             delete_computed_netcdf=True,
             domain=None,
-            computed_vars=[],
-            analysis_hour=None, #TODO remove analysis_hour in instanciation 
+            computed_vars=[], #run=None,  # TODO remove run in instanciation
             autofetch_native=False,
             members=[None],
             model=None
@@ -329,7 +302,6 @@ class ComputedValues:
         self.delete_computed_netcdf = delete_computed_netcdf
         self.models = get_model_names(self.computed_vars)
         self.native_vars_by_model = sort_native_vars_by_model(self.computed_vars)
-        self.analysis_hour = analysis_hour
         self.computed_files = defaultdict(lambda: [])
         self.folderLayout = folderLayout
         self.cache_managers = self._cache_managers(folderLayout, self.computed_vars, autofetch_native)
@@ -341,6 +313,10 @@ class ComputedValues:
             model_vars = arome
         elif model == "PEAROME":
             model_vars = pearome
+        elif model == "AROME_analysis":
+            model_vars = arome_analysis
+        elif model == "ARPEGE":
+            model_vars = arpege
         else:
             raise NotImplementedError(f"{model} is not implemented. Current model available are:"
                                       f"'AROME' and 'PEAROME'")
@@ -361,7 +337,6 @@ class ComputedValues:
                 domain=self.domain,
                 variables=native_vars,
                 model=model_name,
-                runtime=time(hour=self.analysis_hour),
                 delete_native=self.delete_native,
                 autofetch_native=autofetch_native,
                 member=member
@@ -407,11 +382,10 @@ class ComputedValues:
 
     # old get_file_hash
     def get_name_file_in_computed(self, date, term, member, domain):
-        date_str = f"date_{date.strftime('%Y%m%d')}"
-        run_str = f"runtime_{self.analysis_hour}h"
-        term_str = f"term_{term}h"
+        date_str = f"date_{date.strftime('%Y%m%d%H')}"
+        term_str = f"_term_{term}" if term is not None else ""
         member_str = f"_mb{member:03d}" if member else ""
-        filename = f"{self.model}_{date_str}_{run_str}_{term_str}_{domain}{member_str}.nc"
+        filename = f"{self.model}_{date_str}{term_str}_{domain}{member_str}.nc"
         return filename
 
     # old get_filepath
@@ -423,8 +397,7 @@ class ComputedValues:
     def get_path_file_in_final(self, time_tag, member, domain):
         filepath = self.folderLayout._final_
         str_member = f"_mb{member:03d}" if member else ""
-        run_str = f"run_{self.analysis_hour}h"
-        filename = f"{self.model}_{domain}_{time_tag}_{run_str}{str_member}.nc"
+        filename = f"{self.model}_{domain}_{time_tag}{str_member}.nc"
         return os.path.join(filepath, filename)
 
     @staticmethod
@@ -511,12 +484,12 @@ class ComputedValues:
             os.remove(filename)
             os.rename(filename.split(".nc")[0]+"_tmp.nc", filename)
 
-    def compute(self, date, term): # compute(self, datetimerun_, term)
+    def compute(self, run, term): # compute(self, datetimerun_, term)
         for member in self.members:
             for domain in self.domain:
 
                 # Look at files already computed
-                path_file_in_computed = self.get_path_file_in_computed(date, term, member, domain)
+                path_file_in_computed = self.get_path_file_in_computed(run, term, member, domain)
                 file_is_already_computed = os.path.isfile(path_file_in_computed)
 
                 if file_is_already_computed:
@@ -527,9 +500,9 @@ class ComputedValues:
 
                     # Iterate on variables asked by the user (i.e. computed var)
                     for computed_var in self.computed_vars:
-                        computed_values = self.compute_variables_in_cache(computed_var, member, date, term, domain)
+                        computed_values = self.compute_variables_in_cache(computed_var, member, run, term, domain)
                         variables_storage[computed_var.name] = computed_values
-                    variables_storage['time'] = validity_date(self.analysis_hour, date, term)
+                    variables_storage['time'] = validity_date(run, term)
 
                     # Create netcdf file of computed values
                     self.save_computed_vars_to_netcdf(path_file_in_computed, variables_storage)

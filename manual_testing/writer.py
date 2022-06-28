@@ -16,7 +16,7 @@ arome_cache_manager = AromeCacheManager(
     native_files_folder=native_files_folder,
     cache_folder=cache_folder,
     model='AROME',
-    runtime=time(0),
+    run=time(0),
     delete_native=False
 )
 
