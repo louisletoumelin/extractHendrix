@@ -19,6 +19,7 @@ from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.config.config_fa_or_grib2nc import alternatives_names_fa
 from extracthendrix.exceptions import CanNotReadEpygramField
+from extracthendrix.config.variables import arome, pearome
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -305,18 +306,29 @@ class ComputedValues:
             members=[None],
             model=None
     ):
-        self.computed_vars = computed_vars  # i.e. variables given by the user (e.g. 'Tair' and not 'CLSTEMPERATURE)
+        self.computed_vars = self.str2attrs(model, computed_vars)
         self.members = members
         self.domain = domain
         self.delete_native = delete_native
         self.delete_computed_netcdf = delete_computed_netcdf
-        self.models = get_model_names(computed_vars)
-        self.native_vars_by_model = sort_native_vars_by_model(computed_vars)
+        self.models = get_model_names(self.computed_vars)
+        self.native_vars_by_model = sort_native_vars_by_model(self.computed_vars)
         self.analysis_hour = analysis_hour
         self.computed_files = defaultdict(lambda: [])
         self.folderLayout = folderLayout
-        self.cache_managers = self._cache_managers(folderLayout, computed_vars, autofetch_native)
+        self.cache_managers = self._cache_managers(folderLayout, self.computed_vars, autofetch_native)
         self.model = model
+
+    @staticmethod
+    def str2attrs(model, variables):
+        if model == "AROME":
+            model_vars = arome
+        elif model == "PEAROME":
+            model_vars = pearome
+        else:
+            raise NotImplementedError(f"{model} is not implemented. Current model available are:"
+                                      f"'AROME' and 'PEAROME'")
+        return [getattr(model_vars, variable) for variable in variables]
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):
         """
@@ -462,7 +474,7 @@ class ComputedValues:
             cache_manager.delete_native_files()
 
     def make_surfex_compliant(self):
-        # Add necessary data for SURFEX
+        """Add necessary data for SURFEX"""
         for file in os.listdir(self.folderLayout._final_):
             filename = os.path.join(self.folderLayout._final_, file)
             ds = xr.open_dataset(filename)
