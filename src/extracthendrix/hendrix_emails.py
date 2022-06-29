@@ -4,9 +4,6 @@ from email.mime.text import MIMEText
 from email.utils import formatdate
 import logging
 import warnings
-import time
-
-import numpy as np
 
 
 logger = logging.getLogger(__name__)
@@ -88,14 +85,20 @@ dict_with_all_emails = \
     )
 
 
-class DictNamespace():
-
+class DictNamespace:
+    """A trick to use attributes instead of dictionary keys"""
     def __init__(self, dict_):
         self.__dict__ = dict_
 
 
 def send_email(email_address, subject, content):
-    """Send email to email_address using Météo-France network"""
+    """
+    Send email to email_address using Météo-France network
+
+    :param email_address: Email adress.
+    :param subject: Subject of the email.
+    :param content: Content of the email.
+    """
     server = smtplib.SMTP()
     server.connect('smtp.cnrm.meteo.fr')
     server.helo()
@@ -119,10 +122,25 @@ def send_email(email_address, subject, content):
 
 
 def get_first_and_last_name_from_email(email_address):
+    """
+    Parse email to return first name and last name
+
+    e.g.
+    >> get_first_and_last_name_from_email("john.doe@mail.com")
+        "John Doe"
+    :param email_address:
+    :return:
+    """
     return email_address.split("@")[0].replace('.', ' ').title()
 
 
 def send_success_email(config_user):
+    """
+    Prepare a function to send email when extraction has occurred without problem.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    :return: Function ready to send an email.
+    """
     def emailsender(current_time, time_to_download):
         c = DictNamespace(config_user)
         user = get_first_and_last_name_from_email(c.email_adress)
@@ -139,6 +157,12 @@ def send_success_email(config_user):
 
 
 def send_problem_extraction_email(config_user):
+    """
+    Prepare a function to send email when a problem is encountered during extraction.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    :return: Function ready to send an email.
+    """
     def emailsender(exception, time_fail, nb_attempts, time_to_next_retry):
         c = DictNamespace(config_user)
         user = get_first_and_last_name_from_email(c.email_adress)
@@ -156,6 +180,12 @@ def send_problem_extraction_email(config_user):
 
 
 def send_script_stopped_email(config_user):
+    """
+    Prepare a function to send email when extraction has stopped.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    :return: Function ready to send an email.
+    """
     def emailsender(exception, current_time):
         c = DictNamespace(config_user)
         user = get_first_and_last_name_from_email(c.email_adress)
