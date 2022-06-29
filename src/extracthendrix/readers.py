@@ -52,7 +52,17 @@ def model_ini_to_dict(model_name):
 
 #  old get_model_description
 def get_all_resource_descriptions(model_name, member=None):
-    """Get vortex description of a model"""
+    """
+
+    Get vortex descriptions of a model.
+
+    If a key of the resource_description changes with time (e.g. namespace), this will result in several
+    resource descriptions
+
+    :param model_name: Model name.
+    :param member: Member number
+    :return: List of model descriptions
+    """
 
     dict_model = model_ini_to_dict(model_name)
 
@@ -69,6 +79,8 @@ def get_all_resource_descriptions(model_name, member=None):
 
 
 class HendrixFileReader:
+    """This class deals with file on Hendrix."""
+
     def file_in_cache_path(self, date, term):
         """Not used"""
         filepath = self.folderLayout._cache_
@@ -77,6 +89,13 @@ class HendrixFileReader:
 
     # old native_file_path
     def get_path_file_in_native(self, date, term):
+        """
+        Return path of the file in _native_ for the corresponding date/term combination.
+
+        :param date: Run time.
+        :param term: Forecast lead time.
+        :return: Path of the file.
+        """
         filepath = self.folderLayout._native_
         filename = self.get_file_hash(date, term)
         filename = f"{filename}.{self.fmt}"
@@ -291,12 +310,19 @@ class VortexWitchCraftReader(S2MTaskMixIn):
 
 
 class AromeHendrixReader(HendrixFileReader):
+    """This class helps to extract AROME and ARPEGE files on Hendrix"""
     def __init__(self,
                  folderLayout=None,
                  model=None,
                  member=None,
                  getmode='get',
                  ):
+        """
+        :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
+        :param model: Model name
+        :param member: Member number
+        :param getmode: getmode (for testing purpose)
+        """
         self.folderLayout = folderLayout
         self.getmode = getmode
         self.model_name = model
@@ -306,6 +332,13 @@ class AromeHendrixReader(HendrixFileReader):
         self.fmt = self.list_resource_descriptions[0]['nativefmt']  # FA or GRIB
 
     def get_file_hash(self, date, term):
+        """
+        Return file hash (i.e. part of the filename).
+
+        :param date: Run time.
+        :param term: Forecast lead time.
+        :return: hash (str).
+        """
         date = date.strftime("%Y%m%d%H")
         memberstr = f"_mb{self.member:03d}" if self.member else ""
         term = f"_term{term}" if term is not None else ""
@@ -335,13 +368,19 @@ class AromeHendrixReader(HendrixFileReader):
         return filelist, notfound
 
     def _get_vortex_resource_description(self, date, term):
+        """
+        Prepare resource descriptions for downloading data with Vortex on Hendrix.
+
+        :param date: Run time
+        :param term: Forecast lead time
+        :return: List of resource descriptions.
+        """
         resource_descriptions = [dict(
             **model_description,
             date=date,
             term=term
         ) for model_description in self.list_resource_descriptions]
 
-        # todo I don't understand here
         if self.getmode == 'get':
             for resource in resource_descriptions:
                 resource['local'] = os.path.join(self.get_path_file_in_native(date, term))
@@ -364,7 +403,7 @@ class AromeHendrixReader(HendrixFileReader):
         if file_already_downloaded:
             return filepath
 
-        # todo autofetch?
+        # Test purpose
         if not autofetch:
             raise NativeFileUnfetchedException()
 
