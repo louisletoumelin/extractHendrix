@@ -193,7 +193,6 @@ def execute(config_user):
         if computer.files_are_in_final(time_tag):
             continue
         else:
-
             if grouper.batch_is_complete(previous_date, current_date):
                 computer.concat_and_clean_computed_folder(time_tag)
                 computer.clean_cache_folder()
@@ -209,16 +208,16 @@ def execute(config_user):
     computer.concat_and_clean_computed_folder(last_time_tag)
     computer.clean_cache_folder()
 
+    # Clean predictions
+    layout.clean_layout()
+    computer.make_surfex_compliant()
+    computer.clean_final_folder()
+
     # Record end time
     extraction_ends = datetime.now()
 
     # Email
     send_success_email(config_user)(extraction_ends, extraction_ends - extraction_starts)
-
-    # Clean predictions
-    layout.clean_layout()
-    computer.make_surfex_compliant()
-    computer.clean_final_folder()
 
 
 def get_prestaging_file_list(config_user):

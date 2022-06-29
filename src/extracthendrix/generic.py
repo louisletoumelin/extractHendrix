@@ -523,11 +523,28 @@ class ComputedValues:
 
     # old get_filepath
     def get_path_file_in_computed(self, date, term, member, domain):
+        """
+        Return path of the file in _computed_ for the corresponding date/term/member/domain combination.
+
+        :param date: Run time.
+        :param term: Forecast lead time.
+        :param member: Member number.
+        :param domain: Geographical domain.
+        :return: Path of the file
+        """
         filepath = self.folderLayout._computed_
         filename = self.get_name_file_in_computed(date, term, member, domain)
         return os.path.join(filepath, filename)
 
     def get_path_file_in_final(self, time_tag, member, domain):
+        """
+        Return path of the file in _çfinal_ for the corresponding date/term/member/domain combination.
+
+        :param time_tag: Run time.
+        :param member: Member number.
+        :param domain: Geographical domain.
+        :return: Path of the file
+        """
         filepath = self.folderLayout._final_
         str_member = f"_mb{member:03d}" if member else ""
         filename = f"{self.model}_{domain}_{time_tag}{str_member}.nc"
@@ -535,17 +552,24 @@ class ComputedValues:
 
     @staticmethod
     def get_model_name_from_computed_var(computed_var):
-        """Gives model name given input variable"""
+        """Gives model name given computed variable (e.g. 'Tair' and not 'CLSTEMPERATURE')"""
         return computed_var.native_vars[0].model_name
 
     @staticmethod
     def save_computed_vars_to_netcdf(filepath_computed, variables_storage):
+        """
+        Save computed files (e.g. Winf speed computed from .fa or .grib native files using wind components).
+
+        :param filepath_computed: File path to save data.
+        :param variables_storage: Dictionary where are temporarily stored computed data.
+        """
         computed_dataset = xr.Dataset({variable_name: variable_data
                                        for variable_name, variable_data in variables_storage.items()})
         computed_dataset = computed_dataset.expand_dims(dim='time').set_coords('time')
         computed_dataset.to_netcdf(filepath_computed)
 
     def _move_files_to_domain_folders(self):
+        """Move files from _final_ folder to a domain specific foilder (e.g; "alps/") when computations are finished."""
         for domain in self.domain:
             # Create a folder for each domain
             path_domain = os.path.join(self.folderLayout._final_, domain)
@@ -559,6 +583,12 @@ class ComputedValues:
                     os.rename(current_path, new_path)
 
     def _rename_final_folder(self):
+        """
+        Rename _final_ folder into 'HendriExtraction_{Y_m_d_H}_ID_{ID}
+
+        The ID is a random uuid and permits to performs several extraction with extracthendrix in the same folder
+        without deleting folders used in former extractions.
+        '"""
         date_str = datetime.now().strftime("%Y_%m_%d_%H")
         id_ = str(uuid.uuid1())[:5]
         filename = f"HendrixExtraction_{date_str}_ID_{id_}"
@@ -566,11 +596,19 @@ class ComputedValues:
         os.rename(self.folderLayout._final_, new_name)
 
     def clean_final_folder(self):
+        """
+        Move files into domain specific folders and rename _final_ folder
+
+        e.g. for an extraction of the french Alps and Switzerland:
+        ├── _final_
+        │   ├── alps
+        │   ├── swiss
+        """
         self._move_files_to_domain_folders()
         self._rename_final_folder()
 
     def files_are_in_final(self, time_tag):
-
+        """Check if files are already downloaded in _final folder for specific time (time_tag)"""
         # Look at files already computed
         files_in_final = []
         for member in self.members:
@@ -581,7 +619,16 @@ class ComputedValues:
         return any(files_in_final)
 
     def compute_variables_in_cache(self, computed_var, member, date, term, domain):
+        """
+        Trigger computation in cache.
 
+        :param computed_var: Name of computed variables (e.g. "Tair" and not "CLSTEMPERATURE").
+        :param member: Member number.
+        :param date: Run time.
+        :param term: Forecast lead time.
+        :param domain: Geographical domain name.
+        :return: xarray dataset.
+        """
         # Parameters to read in cache
         model_name = self.get_model_name_from_computed_var(computed_var)
         read_cache_func = self.cache_managers[(model_name, member)].read_cache
@@ -591,6 +638,7 @@ class ComputedValues:
         return computed_values
 
     def delete_native_files(self):
+        """Delete files in native folder."""
         for cache_manager in self.cache_managers.values():
             # Delete .fa or .grib file after extraction of desired variables
             cache_manager.delete_native_files()
@@ -600,8 +648,14 @@ class ComputedValues:
         for file in os.listdir(self.folderLayout._final_):
             filename = os.path.join(self.folderLayout._final_, file)
             ds = xr.open_dataset(filename)
+
+            # Rename Latitude and longitude
             ds = ds.rename({"latitude": "LAT", "longitude": "LON"})
+
+            # Add forcing time step as an attribute
             ds.attrs["FORC_TIME_STEP"] = 3600
+
+            # Add new variables: CO2air, UREF, ZREF, slope, aspect and FRC_TIME_STP
             xx = len(ds.xx)
             yy = len(ds.yy)
             time = len(ds.time)
@@ -613,11 +667,19 @@ class ComputedValues:
             ds["slope"] = (("xx", "yy"), np.zeros((xx, yy)))
             ds["aspect"] = (("xx", "yy"), np.zeros((xx, yy)))
             ds["FRC_TIME_STP"] = 3600
+
+            # Save file to netcdf
             ds.to_netcdf(filename.split(".nc")[0]+"_tmp.nc", unlimited_dims={"time": True})
             os.remove(filename)
             os.rename(filename.split(".nc")[0]+"_tmp.nc", filename)
 
-    def compute(self, run, term): # compute(self, datetimerun_, term)
+    def compute(self, run, term):
+        """
+        Triggers computation of computed variables (i.e. variables asked by the user)
+
+        :param run: Run time.
+        :param term: Forecast lead time (None for analysis).
+        """
         for member in self.members:
             for domain in self.domain:
 
