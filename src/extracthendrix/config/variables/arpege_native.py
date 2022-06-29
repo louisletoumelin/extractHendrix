@@ -18,7 +18,15 @@ vars = {'zs': dict(name='Geometrical height', shortName='h', parameterCategory=3
                 'productDefinitionTemplateNumber': 0}
         }
 
+"""
+Sometime, the name of a variable can change with time (ex: wind gust).
+Here are alternative names to check if first name is not found
+"""
+
+alternatives_names = {}
+
 module = sys.modules[__name__]
-for name, gribdict in vars.items():
-    setattr(module, name,
-            NativeVariable(model_name=model, name=gribdict, outname=name))
+for name in vars:
+    alternative_names = alternatives_names.get(name)
+    native_var = NativeVariable(model_name=model, name=name, alternative_names=alternative_names)
+    setattr(module, name.replace('.', '__'), native_var)  # Replace '.' in names by '__'

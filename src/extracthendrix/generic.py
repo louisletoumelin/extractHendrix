@@ -81,6 +81,7 @@ class AromeCacheManager:
             folderLayout,
             domain=None,
             native_variables=[],
+            alternative_names={},
             model=None,
             delete_native=True,
             member=None,
@@ -107,7 +108,8 @@ class AromeCacheManager:
         self.coordinates = ['latitude', 'longitude']
         self.extractor = AromeHendrixReader(folderLayout, model, member)
         self.domain = domain
-        self.variables = native_variables
+        self.native_variables = native_variables
+        self.alternative_names = alternative_names
         self.autofetch_native = autofetch_native
         self.opened_files = {}
 
@@ -159,27 +161,25 @@ class AromeCacheManager:
         :return: Epygram field
         """
         initial_name = variable
-
         try:
             return input_resource.readfield(variable.name)
         except AssertionError:
-            if variable in alternatives_names_fa:
-                alternatives_names = copy.deepcopy(
-                    alternatives_names_fa[variable])
+            if variable.alternative_names:
+                alternatives_names = copy.deepcopy(variable.alternative_names)
                 while alternatives_names:
                     try:
                         variable = alternatives_names.pop(0)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
-                        logger.warning(f"Found an alternative name for {initial_name} that works: {variable}\n\n")
+                        logger.warning(f"Found an alternative name for {initial_name} that works: {variable}")
                         return field
                     except AssertionError:
-                        logger.error(f"Alternative name {variable} didn't work for variable {initial_name}\n\n")
+                        logger.error(f"Alternative name {variable} didn't work for variable {initial_name}")
                         pass
-                logger.error(f"We coulnd't find correct alternative names for {initial_name}\n\n")
+                logger.error(f"We coulnd't find correct alternative names for {initial_name}")
                 raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
             else:
-                logger.error(f"We couldn't read {initial_name}\n\n")
+                logger.error(f"We couldn't read {initial_name}")
                 raise CanNotReadEpygramField(f"We couldn't read {initial_name}")
 
     @staticmethod
@@ -247,7 +247,7 @@ class AromeCacheManager:
                 field.sp2gp()
             field = self.extract_subgrid(field, domain)
             output_resource.writefield(field)
-        logger.debug(f" .fa or .grib file converted to netcdf for date {date} and term {term}\n\n")
+        logger.debug(f" .fa or .grib file converted to netcdf for date {date}, term {term} and domain {domain}")
 
     def get_file_in_cache(self, filepath):
         """
@@ -267,7 +267,8 @@ class AromeCacheManager:
 
         :param filepath: Path to file
         """
-        dataset = xr.open_dataset(filepath).set_coords(self.coordinates)
+        dataset = xr.open_dataset(filepath)
+        dataset = dataset.set_coords(self.coordinates)
         self.opened_files[filepath] = dataset
 
     def forget_opened_files(self):
@@ -303,6 +304,8 @@ class AromeCacheManager:
         file_is_not_in_cache = not os.path.isfile(filepath_in_cache)
         if file_is_not_in_cache:
             self.put_in_cache(date, term, domain)
+            logger.debug(f"File {date}, term {term}, domain {domain} already in cache")
+
 
         # Return the file from cache
         dataset = self.get_file_in_cache(filepath_in_cache)
@@ -430,7 +433,8 @@ class ComputedValues:
             (model_name, member): AromeCacheManager(
                 folderLayout=folderLayout,
                 domain=self.domain,
-                variables=native_vars,
+                native_variables=native_vars,
+                alternative_names={var: var.alternative_names for var in native_vars},
                 model=model_name,
                 delete_native=self.delete_native,
                 autofetch_native=autofetch_native,
@@ -689,6 +693,7 @@ class ComputedValues:
 
                 if file_is_already_computed:
                     self.computed_files[(member, domain)].append(path_file_in_computed)
+                    logger.debug(f"File {run}, term {term}, domain {domain}, member {member} already in cache")
                 else:
                     # Store computed values before saving to netcdf
                     variables_storage = defaultdict(lambda: [])

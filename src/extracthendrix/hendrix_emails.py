@@ -114,10 +114,10 @@ def send_email(email_address, subject, content):
     msg.attach(part)
     try:
         server.sendmail(from_addr, to_addrs, msg.as_string())
-        logger.info(f"Successfully sent an email to {to_addrs}\n\n")
+        logger.info(f"Successfully sent an email to {to_addrs}")
     except smtplib.SMTPException as e:
         logger.error(
-            f"Email could not be launched. The error is: {e}\n\n")
+            f"Email could not be launched. The error is: {e}")
     server.quit()
 
 

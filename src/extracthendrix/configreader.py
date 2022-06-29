@@ -2,26 +2,47 @@ from datetime import datetime, time, timedelta
 import functools
 import time as timeutils
 import os
+import logging
+import glob
 
 from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
 
+logging.getLogger("footprints").setLevel("ERROR")
+logging.getLogger('vortex').setLevel("ERROR")
+logging.basicConfig(level=logging.DEBUG,
+                    handlers=[logging.StreamHandler()],
+                    format='\n[%(asctime)s][%(name)s][%(levelname)s]%(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel("DEBUG")
+
 
 def onRetryDefault(exception_raised, time_fail, nb_attempts, time_to_next_retry):
     """Print when retry to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
-    print(exception_raised, time_fail, nb_attempts, time_to_next_retry)
+    #print(exception_raised, time_fail, nb_attempts, time_to_next_retry)
+    logger.warning(exception_raised, time_fail, nb_attempts, time_to_next_retry)
 
 
 def onFailureDefault(exception_raised, current_time):
     """Print when failed to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
-    print(exception_raised, current_time)
+    #print(exception_raised, current_time)
+    logger.warning(exception_raised, current_time)
+
+
+def delete_last_file_in_folder(path):
+    list_of_files = glob.glob(path + '/*')
+    if list_of_files:
+        latest_file = max(list_of_files, key=os.path.getctime)
+        os.remove(latest_file)
+        logger.info(f"Deleted {latest_file}")
 
 
 def retry_and_finally_raise(
         onRetry=onRetryDefault,
         onFailure=onFailureDefault,
-        time_retries=[timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]]):
+        layout=None,
+        time_retries=[timedelta(hours=0.01)]): #timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]
     """
     Decorator to retry extraction when an error is raised, until a point where we assume the code failed and raise
     an exception.
@@ -50,6 +71,10 @@ def retry_and_finally_raise(
                 return func(*args)
             except Exception as E:
                 onFailure(E, timeutils.asctime())
+                if layout:
+                    delete_last_file_in_folder(layout._cache_)
+                    delete_last_file_in_folder(layout._computed_)
+                    delete_last_file_in_folder(layout._native_)
                 raise E
         return wrapper_retry
     return decorator_retry
@@ -185,8 +210,26 @@ def execute(config_user):
     """
     Main function that triggers the execution of the extraction as specified by the user in config_user.
 
+    Example of a config user:
+
+        config_user = dict(
+            work_folder="/home/letoumelinl/develop/examples/",
+            model="AROME",
+            domain=["alp", "switzerland"],
+            variables=["SWE"],
+            email_adress="louis.letoumelin@meteo.fr",
+            start_date=datetime(2022, 6, 26),
+            end_date=datetime(2022, 6, 26),
+            groupby=('timeseries', 'daily'),
+            run=0,
+            delta_t=1,
+            start_term=6,
+            end_term=30)
+
     :param config_user: Dictionary containing the configuration as given by the user.
     """
+    logger.info("Start extraction")
+
     # Record time
     extraction_starts = datetime.now()
 
@@ -219,6 +262,7 @@ def execute(config_user):
 
         # Look if all files (all members and all domains) are already in final folder
         if computer.files_are_in_final(time_tag):
+            logger.debug(f"File {date_}, term {term}, already in cache")
             continue
         else:
             if grouper.batch_is_complete(previous_date, current_date):
@@ -227,7 +271,8 @@ def execute(config_user):
 
             retry_and_finally_raise(
                 onRetry=send_problem_extraction_email(config_user),
-                onFailure=send_script_stopped_email(config_user)
+                onFailure=send_script_stopped_email(config_user),
+                layout=layout
             )(computer.compute)(*current_date)
 
             previous_date = (date_, term)
@@ -246,6 +291,8 @@ def execute(config_user):
 
     # Email
     send_success_email(config_user)(extraction_ends, extraction_ends - extraction_starts)
+
+    logger.info("Extraction finished")
 
 
 def get_prestaging_file_list(config_user):
