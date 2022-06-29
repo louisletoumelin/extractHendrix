@@ -9,23 +9,30 @@ from extracthendrix.hendrix_emails import send_problem_extraction_email, send_sc
 
 
 def onRetryDefault(exception_raised, time_fail, nb_attempts, time_to_next_retry):
+    """Print when retry to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
     print(exception_raised, time_fail, nb_attempts, time_to_next_retry)
 
 
 def onFailureDefault(exception_raised, current_time):
+    """Print when failed to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
     print(exception_raised, current_time)
 
 
 def retry_and_finally_raise(
         onRetry=onRetryDefault,
         onFailure=onFailureDefault,
-        time_retries=[]
-):  #[timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]]
+        time_retries=[timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]]):
     """
-    Args:
-    cache_method (:obj:`method`): La méthode à exécuter
-    config_user (:obj:`extractHendrix.configreader.ConfigReader`): la configuration de l'utilisateur
-    time_retries (:obj:`list` of :obj:`datetime.timedelta`): les intervalles de temps au bout desquels relancer la fonction en cas d'échec
+    Decorator to retry extraction when an error is raised, until a point where we assume the code failed and raise
+    an exception.
+
+    This permits to wait when Hendrix has problem and not stop the extraction. For example, if Hendrix has a problem
+    for 3 hours we will wait before relaunching the extraction.
+
+    :param onRetry: Function to print on retry.
+    :param onFailure: Function to print on failure.
+    :param time_retries: Time intervals to wait before trying to relaunch extraction.
+    :type time_retries: list of datetime.timedelta.
     """
     def decorator_retry(func):
         @functools.wraps(func)
@@ -99,7 +106,16 @@ class DictNamespace:
 
 
 class TimeIterator:
+    """
+    A class to select the iterator:
+
+    1. Iterate on terms with runtime fixed for forecast.
+    2. Iterate on runtime with term fixed for analysis.
+    """
     def __init__(self, config_user):
+        """
+        :param config_user: Dictionary containing the configuration as given by the user.
+        """
         self.model = config_user.get("model")
         self.run = config_user.get("run")
         self.start_date = config_user.get("start_date")
@@ -113,6 +129,7 @@ class TimeIterator:
         assert isinstance(self.end_date, datetime)
 
     def dateiterator(self):
+        """Depreciated, old iterator"""
         current_date = self.start_date
         while current_date <= self.end_date:
             current_term = self.start_term
@@ -122,6 +139,7 @@ class TimeIterator:
             current_date += timedelta(days=1)
 
     def dateiteratorforecast(self):
+        """Iterator for forecasts"""
         current_date = self.start_date
         while current_date <= self.end_date:
             current_term = self.start_term
@@ -131,12 +149,14 @@ class TimeIterator:
             current_date += timedelta(days=1)
 
     def dateiteratoranalysis(self):
+        """Iterator for analysis"""
         current_datetime = self.start_date
         while current_datetime <= self.end_date:
             yield (current_datetime, self.term)
             current_datetime += timedelta(hours=self.delta_t)
 
     def get_iterator(self):
+        """Return the appropriate iterator given a model name"""
         if "analysis" in self.model:
             return self.dateiteratoranalysis()
         else:
@@ -144,7 +164,10 @@ class TimeIterator:
 
 
 def check_config_user(config_user):
-
+    """
+    Assert that user configuration, i.e. the dictionary given by the user with all the specifiactions of the extraction,
+    is correct
+    """
     assert config_user["start_date"] <= config_user["end_date"], "Start date must be before or equal to end date"
 
     if not isinstance(config_user["domain"], list):
@@ -159,6 +182,11 @@ def check_config_user(config_user):
 
 
 def execute(config_user):
+    """
+    Main function that triggers the execution of the extraction as specified by the user in config_user.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    """
     # Record time
     extraction_starts = datetime.now()
 
@@ -221,6 +249,11 @@ def execute(config_user):
 
 
 def get_prestaging_file_list(config_user):
+    """
+    Prepare a list with the content of a prestaging file.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    """
     c = DictNamespace(config_user)
     model_names = get_model_names(c.variables)
     listfiles = []
@@ -236,6 +269,11 @@ def get_prestaging_file_list(config_user):
 
 
 def get_prestaging_file(config_user):
+    """
+    Write a .txt file the information necessary for prestagging.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    """
     c = DictNamespace(config_user)
     layout = FolderLayout(work_folder=c.work_folder)
     listfiles, _ = get_prestaging_file_list(config_user)
@@ -243,5 +281,15 @@ def get_prestaging_file(config_user):
     with open(filepath, 'w') as fp:
         for element in listfiles:
             fp.write(element + "\n")
-    print("prestaging info successfully written to {filepath}".format(
-        filepath=filepath))
+
+    print("\n\nPlease find below the procedure for prestaging. \
+        Note a new file named 'request_prestaging_*.txt' has been created on your current folder\n\n1. \
+        Drop this file on Hendrix, in the folder DemandeMig/ChargeEnEspaceRapide \
+        \nYou can use FileZilla with your computer, or ftp to drop the file.\n\n2. \
+        Rename the extension of the file '.txt' (once it is on Hendrix) with '.MIG'\n\
+        'request_prestaging_*.txt'  => 'request_prestaging_*.MIG'\n\n\
+        Note: don't rename in '.MIG' before dropping the file on Hendrix, or Hendrix could launch prestaging\
+        before the file is fully uploaded\n\n3. \
+        Please wait for an email from the Hendrix team to download your data\n\n")
+
+    print("Prestaging info successfully written to {filepath}".format(filepath=filepath))
