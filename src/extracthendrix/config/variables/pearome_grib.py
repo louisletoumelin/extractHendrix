@@ -1,6 +1,13 @@
 import sys
 from .utils import NativeVariable
 
+"""
+In this file you will find native variables names in PEAROME. 
+If you need to implement a new variable, please give the native variable here.
+
+See Documentation in arome.py for more details.
+"""
+
 model = "PEAROME"
 
 vars = {'zs': dict(name='Geometrical height', shortName='h', parameterCategory=3, parameterNumber=6,

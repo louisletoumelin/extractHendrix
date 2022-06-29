@@ -4,6 +4,16 @@ from . import arome_native as an
 from . import arome_surface_native as asn
 from .utils import Variable
 
+"""
+In this file you will find AROME variables following the user configuration.
+
+For example, in AROME there is no "wind speed", bt only speed for each of the component wind vector.
+
+Given thoses components we can compute wind speed as a post-processing step. 
+If the user ask "Wind", the code will compute wind speed using AROME components. 
+
+So we need to link what the user asks ("Wind") to the variables in AROME outputs ('CLSVENT.ZONAL', 'CLSVENT.MERIDIEN').
+"""
 
 vars = {
     'Tair':

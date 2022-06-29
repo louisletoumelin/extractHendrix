@@ -3,6 +3,13 @@ from extracthendrix.config.post_proc_functions_new import compute_temperature_in
 from . import arpege_native as arpn
 from .utils import Variable
 
+"""
+In this file you will find ARPEGE variables following the user configuration.
+
+See Documentation in arome.py for more details.
+
+29/06/2022: the variables have to be implemented.
+"""
 
 vars = {
     'ZS': dict(native_vars=[arpn.zs], compute=None, original_long_name="Geometrical height"),

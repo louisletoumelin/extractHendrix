@@ -21,7 +21,6 @@ import numpy as np
 import epygram
 
 # from extracthendrix.core import get_all_resource_descriptions, CanNotReadEpygramField, CanNotAccessVortexResource
-from extracthendrix.config.config_fa_or_grib2nc import transformations, alternatives_names_fa
 from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMatchException, GeometryIsMissingException
 
 logger = logging.getLogger(__name__)

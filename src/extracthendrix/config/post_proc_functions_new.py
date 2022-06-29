@@ -1,8 +1,25 @@
 import numpy as np
 from bronx.meteo.thermo import Thermo
 
+"""
+Here are defined post processing functions.
+
+For example, in AROME temperature is expressed in K, but we can post-process it before saving final file by 
+using one of the post-processing function.
+
+"copy" is the standard function, and other function can be built using this function, including decumulation operations.
+"""
+
 
 def copy(read_cache, date, term, domain, native_variable):
+    """
+    Reading and returning raw data from cache.
+
+    :param read_cache: read cache method from cache manager
+    :param date: analysis date
+    :param term: forecast term
+    :param native_variable: native variable
+    """
     return read_cache(date, term, domain, native_variable)
 
 

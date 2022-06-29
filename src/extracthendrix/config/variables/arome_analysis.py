@@ -3,6 +3,11 @@ from extracthendrix.config.post_proc_functions_new import compute_temperature_in
 from . import arome_analysis_native as ann
 from .utils import Variable
 
+"""
+In this file you will find AROME analysis variables following the user configuration.
+
+See Documentation in arome.py for more details.
+"""
 
 vars = {
     'Tair':

@@ -16,7 +16,6 @@ from extracthendrix.hendrix_emails import send_problem_extraction_email, send_sc
 
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains_descriptions
-from extracthendrix.config.config_fa_or_grib2nc import alternatives_names_fa
 from extracthendrix.exceptions import CanNotReadEpygramField
 from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege
 

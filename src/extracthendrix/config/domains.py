@@ -1,8 +1,11 @@
 import numpy as np
 
 """
-A domain can be defined by coordinates (lat/lon) or indices on the grid of the model
-If indices are given, they will be prioritized.
+A domain can be defined by coordinates (lat/lon) or indices on the grid of the model.
+
+Indices are only valid for AROME and AROME_SURFACE for the moment.
+
+If indices and coordinates are given, indices will be prioritized.
 """
 
 domains_descriptions = {

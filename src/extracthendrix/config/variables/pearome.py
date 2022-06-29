@@ -5,6 +5,12 @@ from extracthendrix.config.variables import pearome_grib as pea
 # from . import arome_surface_native as asn
 from .utils import Variable
 
+"""
+In this file you will find PEAROME variables following the user configuration.
+
+See Documentation in arome.py for more details.
+"""
+
 vars = {
     'Psurf': dict(native_vars=[pea.pres0m], compute=None, original_long_name="Surface pressure"),
     'ZS': dict(native_vars=[pea.zs], compute=None, original_long_name="Geometrical height"),

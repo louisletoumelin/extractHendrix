@@ -1,16 +1,21 @@
 import sys
 from .utils import NativeVariable
 
+"""
+In this file you will find native variables names in AROME. 
+If you need to implement a new variable, please give the native variable here.
+
+Sometime, the name of a variable can change with time (ex: wind gust).
+Here are alternative names (alternatives_names_fa) to check if first name is not found
+
+See Documentation in arome.py for more details.
+"""
+
 model = "AROME"
 
 vars = ['CLSTEMPERATURE', 'S090TEMPERATURE',
         'CLSVENT.ZONAL', 'CLSVENT.MERIDIEN', 'SURFTEMPERATURE']
 
-
-"""
-Sometime, the name of a variable can change with time (ex: wind gust).
-Here are alternative names to check if first name is not found
-"""
 
 alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
                          'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU'],
