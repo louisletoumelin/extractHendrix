@@ -2,7 +2,7 @@ import pytest
 from extracthendrix.readers import AromeHendrixReader, NativeFileUnfetchedException
 from extracthendrix.generic import AromeCacheManager
 from extracthendrix.generic import FolderLayout
-from extracthendrix.configreader import execute
+from extracthendrix.configreader import execute, prestage
 import extracthendrix.config.variables.arome_native as an
 import os
 import shutil
@@ -97,7 +97,7 @@ def test_config_arome():
         model="AROME",
         domain=["alp", "switzerland"],
         variables=["SWE"],
-        email_adress="louis.letoumelin@meteo.fr",
+        email_address="louis.letoumelin@meteo.fr",
         start_date=datetime(2022, 6, 26),
         end_date=datetime(2022, 6, 26),
         groupby=('timeseries', 'daily'),
@@ -238,4 +238,37 @@ def test_pearp():
         results.append(final_folder_exists)
         path_to_file = os.path.join(test_folder, file)
         shutil.rmtree(path_to_file, ignore_errors=True)
+    assert any(results)
+
+
+def test_prestaging():
+
+    for file in os.listdir(test_folder):
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+
+    config_user = dict(
+        work_folder=test_folder,
+        model="AROME",
+        domain=["alp", "switzerland"],
+        variables=["SWE"],
+        email_address="louis.letoumelin@meteo.fr",
+        start_date=datetime(2021, 1, 26),
+        end_date=datetime(2021, 1, 30),
+        groupby=('timeseries', 'daily'),
+        run=0,
+        delta_t=1,
+        start_term=6,
+        end_term=30
+    )
+
+    prestage(config_user)
+
+    results = []
+    for file in os.listdir(test_folder):
+        prestaging_file_exists = ("prestaging" in file)
+        results.append(prestaging_file_exists)
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+
     assert any(results)

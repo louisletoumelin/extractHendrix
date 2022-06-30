@@ -351,7 +351,7 @@ def prestage(config_user):
 
     c = DictNamespace(config_user)
 
-    layout = FolderLayout(work_folder=c.work_folder)
+    layout = FolderLayout(work_folder=c.work_folder, create_layout=False)
 
     listfiles, _ = get_prestaging_file_list(config_user, layout)
     name_str = config_user["email_address"].split("@")[0].replace('.', '_')

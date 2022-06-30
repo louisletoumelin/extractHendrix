@@ -29,9 +29,10 @@ class FolderLayout:
     :type work_folder: str
     """
 
-    def __init__(self, work_folder):
+    def __init__(self, work_folder, create_layout=True):
         self.work_folder = work_folder
-        self.create_layout()
+        if create_layout:
+            self.create_layout()
 
     @staticmethod
     def create_folder_if_doesnt_exist(path):
