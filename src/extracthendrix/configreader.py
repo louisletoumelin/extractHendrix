@@ -72,9 +72,9 @@ def retry_and_finally_raise(
             except Exception as E:
                 onFailure(E, timeutils.asctime())
                 if layout:
-                    delete_last_file_in_folder(layout._cache_)
+                    #delete_last_file_in_folder(layout._cache_)
                     delete_last_file_in_folder(layout._computed_)
-                    delete_last_file_in_folder(layout._native_)
+                    #delete_last_file_in_folder(layout._native_)
                 raise E
         return wrapper_retry
     return decorator_retry
@@ -180,10 +180,24 @@ class TimeIterator:
             yield (current_datetime, self.term)
             current_datetime += timedelta(hours=self.delta_t)
 
+    def dateiterator4dvar(self, synoptic_hour=6):
+        """Iterator for 4dvar analysis"""
+        current_datetime = self.start_date
+        while current_datetime <= self.end_date:
+            hour_analysis = 6 * (current_datetime.hour // synoptic_hour)
+            analysis_date = current_datetime.replace(hour=hour_analysis)
+            term = current_datetime.hour % 6
+            yield (analysis_date, term)
+            current_datetime += timedelta(hours=self.delta_t)
+
     def get_iterator(self):
         """Return the appropriate iterator given a model name"""
-        if "analysis" in self.model:
+        model_is_analysis = "analysis" in self.model
+        model_is_4dvar = "4dvar" in self.model
+        if model_is_analysis and not model_is_4dvar:
             return self.dateiteratoranalysis()
+        elif model_is_4dvar:
+            return self.dateiterator4dvar()
         else:
             return self.dateiteratorforecast()
 

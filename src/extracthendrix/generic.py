@@ -15,7 +15,7 @@ from extracthendrix.hendrix_emails import send_problem_extraction_email, send_sc
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.exceptions import CanNotReadEpygramField
-from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege
+from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -159,7 +159,8 @@ class AromeCacheManager:
         """
         initial_name = variable
         try:
-            return input_resource.readfield(variable.name)
+            field = input_resource.readfield(variable.name)
+            return field
         except AssertionError:
             if variable.alternative_names:
                 alternatives_names = copy.deepcopy(variable.alternative_names)
@@ -303,7 +304,6 @@ class AromeCacheManager:
             self.put_in_cache(date, term, domain)
             logger.debug(f"File {date}, term {term}, domain {domain} already in cache")
 
-
         # Return the file from cache
         dataset = self.get_file_in_cache(filepath_in_cache)
         return dataset[native_variables.outname]
@@ -412,9 +412,11 @@ class ComputedValues:
             model_vars = arome_analysis
         elif model == "ARPEGE":
             model_vars = arpege
+        elif model == "ARPEGE_analysis_4dvar":
+            model_vars = arpege_analysis_4dvar
         else:
             raise NotImplementedError(f"{model} is not implemented. Current model available are:"
-                                      f"'AROME', 'PEAROME', 'ARPEGE'")
+                                      f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar'")
         return [getattr(model_vars, variable) for variable in computed_variables]
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):

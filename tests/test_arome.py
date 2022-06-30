@@ -1,12 +1,10 @@
-import epygram
 import pytest
-from extracthendrix.readers import AromeHendrixReader, NativeFileUnfetchedException
-from extracthendrix.generic import AromeCacheManager, sort_native_vars_by_model, FolderLayout
+from extracthendrix.readers import AromeHendrixReader
+from extracthendrix.generic import FolderLayout
+from extracthendrix.configreader import execute
 import os
 import shutil
 from datetime import date, time, datetime
-from extracthendrix.config.variables import pearome
-import extracthendrix.config.variables.arome_native as an
 
 
 test_folder = f"/cnrm/cen/users/NO_SAVE/{os.environ['HOME'].split('/')[-1]}/extracthendrix/testing/"
@@ -39,7 +37,7 @@ def test_read_arome(folderLayout):
     reader = AromeHendrixReader(folderLayout, model, time(hour=3))
     reader.get_native_file(date(2022, 6, 17), 1)
 
-
+"""
 def test_put_in_cache_arome(helpers):
     try:
         helpers.symlink_files(test_data_folder, test_folder, 'arome', '_native_')
@@ -85,3 +83,90 @@ def test_put_in_cache_arome_no_native_file_no_autofetch(helpers, folder, data_fo
     print("test_put_in_cache_arome_no_native_file_no_autofetch")
     with pytest.raises(NativeFileUnfetchedException):
         cache_manager.put_in_cache(date_, term, domain)
+"""
+
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionnally")
+def test_config_arome():
+
+    config_user = dict(
+        work_folder=test_folder,
+        model="AROME",
+        domain=["alp", "switzerland"],
+        variables=["SWE"],
+        email_adress="louis.letoumelin@meteo.fr",
+        start_date=datetime(2022, 6, 26),
+        end_date=datetime(2022, 6, 26),
+        groupby=('timeseries', 'daily'),
+        run=0,
+        delta_t=1,
+        start_term=6,
+        end_term=30
+    )
+
+    execute(config_user)
+
+    results = []
+    for file in os.listdir(test_folder):
+        final_folder_exists = ("HendrixExtraction" in file) and ("ID" in file)
+        results.append(final_folder_exists)
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+    assert any(results)
+
+
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionnally")
+def test_config_arome_analysis():
+
+    config_user = dict(
+        work_folder=test_folder,
+        model="AROME_analysis",
+        domain=["alp", "switzerland"],
+        variables=["Tair"],
+        email_adress="louis.letoumelin@meteo.fr",
+        start_date=datetime(2022, 6, 26, 0),
+        end_date=datetime(2022, 6, 26, 1),
+        groupby=('timeseries', 'daily'),
+        delta_t=1,
+    )
+
+    execute(config_user)
+
+    results = []
+    for file in os.listdir(test_folder):
+        final_folder_exists = ("HendrixExtraction" in file) and ("ID" in file)
+        results.append(final_folder_exists)
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+    assert any(results)
+
+
+def test_config_arpege():
+
+    for file in os.listdir(test_folder):
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+
+    config_user = dict(
+        work_folder=test_folder,
+        model="ARPEGE",
+        domain=["alp", "switzerland"],
+        variables=["Tair"],
+        email_adress="louis.letoumelin@meteo.fr",
+        start_date=datetime(2022, 6, 26),
+        end_date=datetime(2022, 6, 27),
+        groupby=('timeseries', 'daily'),
+        run=0,
+        delta_t=1,
+        start_term=6,
+        end_term=30
+    )
+
+    execute(config_user)
+
+    results = []
+    for file in os.listdir(test_folder):
+        final_folder_exists = ("HendrixExtraction" in file) and ("ID" in file)
+        results.append(final_folder_exists)
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+    assert any(results)
