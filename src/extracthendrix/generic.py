@@ -1,9 +1,7 @@
 import os
 import copy
 import logging
-from contextlib import contextmanager
-from datetime import time, datetime, timedelta
-import time as timeutils
+from datetime import datetime, timedelta
 from collections import defaultdict
 import glob
 import shutil
@@ -173,7 +171,7 @@ class AromeCacheManager:
                         logger.warning(f"Found an alternative name for {initial_name} that works: {variable}")
                         return field
                     except AssertionError:
-                        logger.error(f"Alternative name {variable} didn't work for variable {initial_name}")
+                        logger.warning(f"Alternative name {variable} didn't work for variable {initial_name}")
                         pass
                 logger.error(f"We coulnd't find correct alternative names for {initial_name}")
                 raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
@@ -228,7 +226,7 @@ class AromeCacheManager:
 
         # Check if file is already in cache
         filepath_in_cache = self.get_path_file_in_cache(date, term, domain)
-        if os.path.isfile(filepath_in_cache):
+        if os.path.isfile(filepath_in_cache) and self.autofetch_native:
             return
 
         # Initialize netcdf file

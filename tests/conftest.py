@@ -1,4 +1,3 @@
-import sys
 import os
 
 
@@ -13,7 +12,7 @@ class Helpers:
         type_: type de dossier de travail de extracthendrix (_native_, _cache_, _computed_, _final-)
         test_data_folder: le dossier contenant les données pour les tests
         subfolder: le sous-dossier du précédent contenant les données pour un test
-        Crée un lien symbolique dans les dossi
+        Crée un lien symbolique dans les dossiers
         """
         native_data_loc = os.path.join(test_data_folder, subfolder, type_)
         list_native_files = os.listdir(native_data_loc)

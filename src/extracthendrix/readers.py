@@ -2,12 +2,8 @@ import logging
 from datetime import timedelta, time, datetime, date
 import itertools
 import os
-import shutil
-import copy
 import configparser
 import pkg_resources
-import functools
-import time as timeutils
 
 import ftplib
 from ftplib import FTP
@@ -17,8 +13,6 @@ from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
 import xarray as xr
 import usevortex
-import numpy as np
-import epygram
 
 # from extracthendrix.core import get_all_resource_descriptions, CanNotReadEpygramField, CanNotAccessVortexResource
 from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMatchException, GeometryIsMissingException
