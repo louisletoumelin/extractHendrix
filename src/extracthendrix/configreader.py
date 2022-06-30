@@ -219,6 +219,7 @@ def check_config_user(config_user):
         str_raise = "In mode time series, between duration between terms must be 24h"
         assert config_user["end_term"] - config_user["start_term"] == 24, str_raise
 
+    return config_user
 
 def execute(config_user):
     """
@@ -231,7 +232,7 @@ def execute(config_user):
             model="AROME",
             domain=["alp", "switzerland"],
             variables=["SWE"],
-            email_adress="louis.letoumelin@meteo.fr",
+            email_address="louis.letoumelin@meteo.fr",
             start_date=datetime(2022, 6, 26),
             end_date=datetime(2022, 6, 26),
             groupby=('timeseries', 'daily'),
@@ -247,7 +248,7 @@ def execute(config_user):
     # Record time
     extraction_starts = datetime.now()
 
-    check_config_user(config_user)
+    config_user = check_config_user(config_user)
 
     # A trick to use c.attribute instead of c["attribute"]
     c = DictNamespace(config_user)
@@ -310,37 +311,57 @@ def execute(config_user):
     logger.info("Extraction finished")
 
 
-def get_prestaging_file_list(config_user):
+def get_prestaging_file_list(config_user, layout):
     """
     Prepare a list with the content of a prestaging file.
 
     :param config_user: Dictionary containing the configuration as given by the user.
     """
     c = DictNamespace(config_user)
-    model_names = get_model_names(c.variables)
+
+    computer = ComputedValues(
+        layout,
+        domain=c.domain,
+        computed_vars=c.variables,
+        autofetch_native=True,
+        model=c.model,
+        members=c.get("members", [None]))
+
+    model_names = get_model_names(computer.computed_vars)
     listfiles = []
     notfound = []
     iterator = TimeIterator(config_user)
-
-    for model_name in model_names:
-        reader = AromeHendrixReader(model=model_name, getmode='locate')
-        model_list_files, model_not_found = reader.get_file_list(iterator.get_iterator())
-        listfiles += model_list_files
-        notfound += model_not_found
+    for member in computer.members:
+        for model_name in model_names:
+            reader = AromeHendrixReader(model=model_name, getmode='locate', member=member)
+            model_list_files, model_not_found = reader.get_file_list(iterator.get_iterator())
+            listfiles += model_list_files
+            notfound += model_not_found
     return listfiles, notfound
 
 
-def get_prestaging_file(config_user):
+def prestage(config_user):
     """
     Write a .txt file the information necessary for prestagging.
 
     :param config_user: Dictionary containing the configuration as given by the user.
     """
+
+    config_user = check_config_user(config_user)
+
     c = DictNamespace(config_user)
+
     layout = FolderLayout(work_folder=c.work_folder)
-    listfiles, _ = get_prestaging_file_list(config_user)
-    filepath = os.path.join(layout.work_folder, 'prestaging.txt')
+
+    listfiles, _ = get_prestaging_file_list(config_user, layout)
+    name_str = config_user["email_address"].split("@")[0].replace('.', '_')
+    begin_str = config_user["start_date"].strftime("%m_%d_%Y")
+    end_str = config_user["end_date"].strftime("%m_%d_%Y")
+    name_txt_file = f"prestaging_{name_str}_{c.model}_begin_{begin_str}_end_{end_str}.txt"
+    filepath = os.path.join(layout.work_folder, name_txt_file)
+
     with open(filepath, 'w') as fp:
+        fp.write(f"#MAIL={c.email_address}\n")
         for element in listfiles:
             fp.write(element + "\n")
 
@@ -355,3 +376,31 @@ def get_prestaging_file(config_user):
         Please wait for an email from the Hendrix team to download your data\n\n")
 
     print("Prestaging info successfully written to {filepath}".format(filepath=filepath))
+
+
+def print_link_to_hendrix_documentation():
+    print("The documentation of the storage system Hendrix is available here:")
+    print("http://confluence.meteo.fr/pages/viewpage.action?pageId=299881305")
+
+
+def print_link_to_confluence_table_with_downloaded_data():
+    link = "http://confluence.meteo.fr/pages/viewpage.action?pageId=314552092"
+    print("\nHave you check that the data you request is not already downloaded at CEN?\n")
+    print("Please see the link below")
+    print(link)
+
+
+def print_link_to_arome_variables():
+    link = "http://intra.cnrm.meteo.fr/aromerecherche/spip.php?article25"
+    print("Website with all AROME variables (might be outdated)")
+    print(link)
+    link = "https://opensource.umr-cnrm.fr/projects/pnt-mine/wiki/Champs_de_surface_des_fichiers_de_sortie_en_PNT"
+    print("Website with all AROME surface variables (might be outdated)")
+    print(link)
+
+
+def documentation():
+    """Print documentation about Hendrix, Data already downloaded at cen, AROME variables"""
+    print_link_to_hendrix_documentation()
+    print_link_to_confluence_table_with_downloaded_data()
+    print_link_to_arome_variables()

@@ -342,6 +342,8 @@ class AromeHendrixReader(HendrixFileReader):
     def get_file_list(self, dateandtermiterator):
         ftp = FTP('hendrix.meteo.fr')
         credentials = netrc().authenticators('hendrix')
+        if credentials is None:
+            credentials = netrc().authenticators('hendrix.meteo.fr')
         ftp.login(credentials[0], credentials[2])
         filelist = []
         notfound = []
@@ -354,8 +356,7 @@ class AromeHendrixReader(HendrixFileReader):
                 for resource_description in resdesc]
             for resource in potential_locations:
                 try:
-                    filelist.append(return_path_if_exists_on_hendrix(
-                        ftp, resource[0].split(':')[1]))
+                    filelist.append(return_path_if_exists_on_hendrix(ftp, resource[0].split(':')[1]))
                 except (ftplib.error_perm, StopIteration):
                     notfound.append(resource[0])
         ftp.close()
@@ -413,4 +414,3 @@ class AromeHendrixReader(HendrixFileReader):
 
         # If not combination works, raise the error
         raise last_exception
-

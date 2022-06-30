@@ -95,7 +95,7 @@ def send_email(email_address, subject, content):
     """
     Send email to email_address using Météo-France network
 
-    :param email_address: Email adress.
+    :param email_address: Email address.
     :param subject: Subject of the email.
     :param content: Content of the email.
     """
@@ -143,7 +143,7 @@ def send_success_email(config_user):
     """
     def emailsender(current_time, time_to_download):
         c = DictNamespace(config_user)
-        user = get_first_and_last_name_from_email(c.email_adress)
+        user = get_first_and_last_name_from_email(c.email_address)
         html = dict_with_all_emails["finished"][1].format(
             user=user,
             config_user=config_user,
@@ -152,7 +152,7 @@ def send_success_email(config_user):
             folder=c.work_folder
         )
         subject = dict_with_all_emails["finished"][0]
-        send_email(c.email_adress, subject, html)
+        send_email(c.email_address, subject, html)
     return emailsender
 
 
@@ -165,7 +165,7 @@ def send_problem_extraction_email(config_user):
     """
     def emailsender(exception, time_fail, nb_attempts, time_to_next_retry):
         c = DictNamespace(config_user)
-        user = get_first_and_last_name_from_email(c.email_adress)
+        user = get_first_and_last_name_from_email(c.email_address)
         html = dict_with_all_emails["problem_extraction"][1].format(
             user=user,
             error_message=exception,
@@ -175,7 +175,7 @@ def send_problem_extraction_email(config_user):
             nb_of_try=nb_attempts
         )
         subject = dict_with_all_emails["problem_extraction"][0]
-        send_email(c.email_adress, subject, html)
+        send_email(c.email_address, subject, html)
     return emailsender
 
 
@@ -188,7 +188,7 @@ def send_script_stopped_email(config_user):
     """
     def emailsender(exception, current_time):
         c = DictNamespace(config_user)
-        user = get_first_and_last_name_from_email(c.email_adress)
+        user = get_first_and_last_name_from_email(c.email_address)
         html = dict_with_all_emails["script_stopped"][1].format(
             user=user,
             config_user=config_user,
@@ -197,5 +197,5 @@ def send_script_stopped_email(config_user):
             folder=c.work_folder,
         )
         subject = dict_with_all_emails["script_stopped"][0]
-        send_email(c.email_adress, subject, html)
+        send_email(c.email_address, subject, html)
     return emailsender

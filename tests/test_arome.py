@@ -35,7 +35,6 @@ def setup_function():
 
 
 def teardown_function(test_folder):
-    print(test_folder)
     shutil.rmtree(test_folder, ignore_errors=True)
 
 
@@ -86,8 +85,6 @@ def test_put_in_cache_arome_no_native_file_no_autofetch(helpers, folder, data_fo
         delete_native=False,
         autofetch_native=False
     )
-    print("debug")
-    print("test_put_in_cache_arome_no_native_file_no_autofetch")
     with pytest.raises(NativeFileUnfetchedException):
         cache_manager.put_in_cache(date_, term, domain)
 
@@ -129,7 +126,7 @@ def test_config_arome_analysis():
         model="AROME_analysis",
         domain=["alp", "switzerland"],
         variables=["Tair"],
-        email_adress="louis.letoumelin@meteo.fr",
+        email_address="louis.letoumelin@meteo.fr",
         start_date=datetime(2022, 6, 26, 0),
         end_date=datetime(2022, 6, 26, 1),
         groupby=('timeseries', 'daily'),
@@ -159,7 +156,7 @@ def test_config_arpege():
         model="ARPEGE",
         domain=["alp", "switzerland"],
         variables=["Tair"],
-        email_adress="louis.letoumelin@meteo.fr",
+        email_address="louis.letoumelin@meteo.fr",
         start_date=datetime(2022, 6, 26),
         end_date=datetime(2022, 6, 27),
         groupby=('timeseries', 'daily'),
@@ -192,7 +189,7 @@ def test_arpege_analysis_4dvar():
         model="ARPEGE_analysis_4dvar",
         domain=["alp", "switzerland"],
         variables=["Tair"],
-        email_adress="louis.letoumelin@meteo.fr",
+        email_address="louis.letoumelin@meteo.fr",
         start_date=datetime(2022, 6, 28, 0),
         end_date=datetime(2022, 6, 29, 5),
         groupby=('timeseries', 'daily'),
@@ -223,7 +220,7 @@ def test_pearp():
         model="PEARP",
         domain=["alp", "switzerland"],
         variables=["Tair"],
-        email_adress="louis.letoumelin@meteo.fr",
+        email_address="louis.letoumelin@meteo.fr",
         start_date=datetime(2022, 6, 28, 0),
         end_date=datetime(2022, 6, 28, 3),
         groupby=('timeseries', 'daily'),
