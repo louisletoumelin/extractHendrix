@@ -15,7 +15,7 @@ from extracthendrix.hendrix_emails import send_problem_extraction_email, send_sc
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.exceptions import CanNotReadEpygramField
-from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar
+from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar, pearp
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -87,7 +87,7 @@ class AromeCacheManager:
         """
         :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
         :param domain: List of geographical domains (e.g. ["alps", "pyr"])
-        :type domain: list
+        :type domain: str
         :param native_variables: list of model native variables
         :type native_variables: list
         :param model: Model name
@@ -414,9 +414,12 @@ class ComputedValues:
             model_vars = arpege
         elif model == "ARPEGE_analysis_4dvar":
             model_vars = arpege_analysis_4dvar
+        elif model == "PEARP":
+            model_vars = pearp
         else:
             raise NotImplementedError(f"{model} is not implemented. Current model available are:"
-                                      f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar'")
+                                      f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', "
+                                      f"'PEARP'")
         return [getattr(model_vars, variable) for variable in computed_variables]
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):

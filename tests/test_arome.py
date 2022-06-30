@@ -1,16 +1,24 @@
 import pytest
-from extracthendrix.readers import AromeHendrixReader
+from extracthendrix.readers import AromeHendrixReader, NativeFileUnfetchedException
+from extracthendrix.generic import AromeCacheManager
 from extracthendrix.generic import FolderLayout
 from extracthendrix.configreader import execute
+import extracthendrix.config.variables.arome_native as an
 import os
 import shutil
 from datetime import date, time, datetime
 
+"""
+To run this file, install pytest (pip install pytest).
+
+pytest --disable-warnings extracthendrix/tests/test_arome.py
+"""
 
 test_folder = f"/cnrm/cen/users/NO_SAVE/{os.environ['HOME'].split('/')[-1]}/extracthendrix/testing/"
 test_data_folder = '/cnrm/cen/users/NO_SAVE/merzisenh/test_data_extracthendrix/'
 folderLayout = FolderLayout(work_folder=test_folder)
 
+# pytest --disable-warnings test_arome.py
 
 @pytest.fixture
 def folder():
@@ -37,7 +45,6 @@ def test_read_arome(folderLayout):
     reader = AromeHendrixReader(folderLayout, model, time(hour=3))
     reader.get_native_file(date(2022, 6, 17), 1)
 
-"""
 def test_put_in_cache_arome(helpers):
     try:
         helpers.symlink_files(test_data_folder, test_folder, 'arome', '_native_')
@@ -83,9 +90,9 @@ def test_put_in_cache_arome_no_native_file_no_autofetch(helpers, folder, data_fo
     print("test_put_in_cache_arome_no_native_file_no_autofetch")
     with pytest.raises(NativeFileUnfetchedException):
         cache_manager.put_in_cache(date_, term, domain)
-"""
 
-@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionnally")
+
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionally")
 def test_config_arome():
 
     config_user = dict(
@@ -114,7 +121,7 @@ def test_config_arome():
     assert any(results)
 
 
-@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionnally")
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionally")
 def test_config_arome_analysis():
 
     config_user = dict(
@@ -140,6 +147,7 @@ def test_config_arome_analysis():
     assert any(results)
 
 
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionally")
 def test_config_arpege():
 
     for file in os.listdir(test_folder):
@@ -160,6 +168,70 @@ def test_config_arpege():
         start_term=6,
         end_term=30
     )
+
+    execute(config_user)
+
+    results = []
+    for file in os.listdir(test_folder):
+        final_folder_exists = ("HendrixExtraction" in file) and ("ID" in file)
+        results.append(final_folder_exists)
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+    assert any(results)
+
+
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionally")
+def test_arpege_analysis_4dvar():
+
+    for file in os.listdir(test_folder):
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+
+    config_user = dict(
+        work_folder=test_folder,
+        model="ARPEGE_analysis_4dvar",
+        domain=["alp", "switzerland"],
+        variables=["Tair"],
+        email_adress="louis.letoumelin@meteo.fr",
+        start_date=datetime(2022, 6, 28, 0),
+        end_date=datetime(2022, 6, 29, 5),
+        groupby=('timeseries', 'daily'),
+        delta_t=1,
+        start_term=6,
+        end_term=30)
+
+    execute(config_user)
+
+    results = []
+    for file in os.listdir(test_folder):
+        final_folder_exists = ("HendrixExtraction" in file) and ("ID" in file)
+        results.append(final_folder_exists)
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+    assert any(results)
+
+
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionally")
+def test_pearp():
+
+    for file in os.listdir(test_folder):
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+
+    config_user = dict(
+        work_folder=test_folder,
+        model="PEARP",
+        domain=["alp", "switzerland"],
+        variables=["Tair"],
+        email_adress="louis.letoumelin@meteo.fr",
+        start_date=datetime(2022, 6, 28, 0),
+        end_date=datetime(2022, 6, 28, 3),
+        groupby=('timeseries', 'daily'),
+        run=0,
+        delta_t=1,
+        start_term=6,
+        end_term=30,
+        members=[1, 2])
 
     execute(config_user)
 

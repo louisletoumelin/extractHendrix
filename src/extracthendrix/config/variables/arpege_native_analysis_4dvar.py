@@ -17,6 +17,7 @@ model = "ARPEGE_analysis_4dvar"
 
 vars = {'zs': dict(name='Geometrical height', shortName='h', parameterCategory=3, parameterNumber=6,
                    typeOfFirstFixedSurface=1, level=0, productDefinitionTemplateNumber=1),
+        # Warning: please verify if "t2m" correspond to this dictionary
         't2m': {'editionNumber': 2,
                 'name': 'Temperature',
                 'shortName': 't',

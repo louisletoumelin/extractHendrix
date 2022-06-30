@@ -13,24 +13,24 @@ See Documentation in arome.py for more details.
 29/06/2022: the variables have to be implemented.
 """
 
-model = "ARPEGE"
+model = "PEARP"
 
 vars = {'zs': dict(name='Geometrical height', shortName='h', parameterCategory=3, parameterNumber=6,
                    typeOfFirstFixedSurface=1, level=0, productDefinitionTemplateNumber=1),
+
         # Warning: please verify if "t2m" correspond to this dictionary
         't2m': {'editionNumber': 2,
-                'name': 'Temperature',
-                'shortName': 't',
-                'discipline': 0,
-                'parameterCategory': 0,
-                'parameterNumber': 0,
-                'typeOfFirstFixedSurface': 1,
-                'level': 0,
-                'typeOfSecondFixedSurface': 255,
-                'tablesVersion': 15,
-                'productDefinitionTemplateNumber': 0}
+        'name': 'Temperature',
+        'shortName': 't',
+        'discipline': 0,
+        'parameterCategory': 0,
+        'parameterNumber': 0,
+        'typeOfFirstFixedSurface': 1,
+        'level': 0,
+        'typeOfSecondFixedSurface': 255,
+        'tablesVersion': 15,
+        'productDefinitionTemplateNumber': 1}
         }
-
 
 alternatives_names = {}
 

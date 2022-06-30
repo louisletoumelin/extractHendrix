@@ -126,8 +126,8 @@ class DictNamespace:
     def __init__(self, dict_):
         self.__dict__ = dict_
 
-    def get(self, key):
-        return self.__dict__.get(key)
+    def get(self, key, default_value=None):
+        return self.__dict__.get(key, default_value)
 
 
 class TimeIterator:
@@ -264,7 +264,8 @@ def execute(config_user):
         domain=c.domain,
         computed_vars=c.variables,
         autofetch_native=True,
-        model=c.model)
+        model=c.model,
+        members=c.get("members", [None]))
 
     # Time iterator
     iterator = TimeIterator(config_user)
