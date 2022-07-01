@@ -92,8 +92,8 @@ def compute_wind_direction(read_cache, date, term, domain, name_u_component, nam
     :param name_v_component: v component of wind
     :return: wind direction
     """
-    u = read_cache(date, term, name_u_component)
-    v = read_cache(date, term, name_v_component)
+    u = read_cache(date, term, domain, name_u_component)
+    v = read_cache(date, term, domain, name_v_component)
     return np.mod(180 + np.rad2deg(np.arctan2(u, v)), 360)
 
 
@@ -138,3 +138,46 @@ def joule2watt_hourly(read_cache, date, term, domain, var):
     """
     rad = read_cache(date, term, domain, var)
     return rad/3600.
+
+
+def compute_decumul_and_negative(read_cache, date, term, domain, native_variable, time_delta=3600):
+    delta = compute_decumul(read_cache, date, term, domain, native_variable)
+    return -delta / time_delta
+
+
+def compute_psurf(read_cache, date, term, domain, native_variable):
+    return np.exp(read_cache(date, term, domain, native_variable))
+
+
+def compute_zs(read_cache, date, term, domain, native_variable):
+    return read_cache(date, term, domain, native_variable) / 9.81
+
+
+def compute_snowfall(read_cache, date, term, domain, native_name_snow, native_name_graupel):
+    snow = compute_decumul(read_cache, date, term, domain, native_name_snow)
+    graupel = compute_decumul(read_cache, date, term, domain, native_name_graupel)
+    return snow + graupel
+
+
+def compute_decumul_and_diff(read_cache, date, term, domain, native_name_1, native_name_2):
+    var1 = read_cache(date, term, domain, native_name_1)
+    var2 = read_cache(date, term, domain, native_name_2)
+    return var1 - var2
+
+
+def compute_latent_heat_flux(read_cache, date, term, domain, native_name_1, native_name_2):
+    evaporation = compute_decumul(read_cache, date, term, domain, native_name_1)
+    sublimation = compute_decumul(read_cache, date, term, domain, native_name_2)
+    return -(evaporation + sublimation)
+
+
+def compute_sum_all_water_species(read_cache, date, term, domain, name_droplet, name_ice, name_snow, name_rain):
+    droplet = compute_decumul(read_cache, date, term, domain, name_droplet)
+    ice = compute_decumul(read_cache, date, term, domain, name_ice)
+    snow = compute_decumul(read_cache, date, term, domain, name_snow)
+    rain = compute_decumul(read_cache, date, term, domain, name_rain)
+    return droplet + ice + snow + rain
+
+
+def compute_multiply_by_100(read_cache, date, term, domain, native_variable):
+    return 100*read_cache(date, term, domain, native_variable)

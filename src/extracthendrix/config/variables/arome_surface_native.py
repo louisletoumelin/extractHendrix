@@ -13,8 +13,7 @@ See Documentation in arome.py for more details.
 
 model = 'AROME_SURFACE'
 
-vars = ['X001WSN_VEG1']
-
+vars = ['X001WSN_VEG1', 'X001RSN_VEG1', 'X001ASN_VEG1', 'X001VEG', 'X001Z0VEG']
 
 alternatives_names_fa = {'X001ASN_VEG1': ['X001ASN_VEG']}
 

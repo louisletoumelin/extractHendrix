@@ -9,8 +9,8 @@ from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, 
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
 
-logging.getLogger("footprints").setLevel("ERROR")
-logging.getLogger('vortex').setLevel("ERROR")
+logging.getLogger("footprints").disabled = True
+logging.getLogger('vortex').disabled = True
 logging.basicConfig(level=logging.DEBUG,
                     handlers=[logging.StreamHandler()],
                     format='\n[%(asctime)s][%(name)s][%(levelname)s]%(message)s')
@@ -220,6 +220,7 @@ def check_config_user(config_user):
         assert config_user["end_term"] - config_user["start_term"] == 24, str_raise
 
     return config_user
+
 
 def execute(config_user):
     """
