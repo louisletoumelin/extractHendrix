@@ -17,6 +17,9 @@ from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.exceptions import CanNotReadEpygramField
 from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar, pearp
 
+logging.getLogger("footprints").setLevel("CRITICAL")
+logging.getLogger('vortex').setLevel("CRITICAL")
+logging.getLogger('epygram').setLevel("CRITICAL")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -43,7 +46,7 @@ class FolderLayout:
         try:
             os.mkdir(path)
         except FileExistsError:
-            print(f"Folder {path} already exists")
+            logger.info(f"[FOLDER LAYOUT] Folder {path} already exists")
 
     def create_layout(self, create_subfolders=True):
         """
@@ -247,7 +250,10 @@ class AromeCacheManager:
                 field.sp2gp()
             field = self.extract_subgrid(field, domain)
             output_resource.writefield(field)
-        logger.debug(f"[CACHE MANAGER] .fa or .grib file converted to netcdf for date {date}, term {term} and domain {domain}")
+        logger.debug(f"[CACHE MANAGER] {self.extractor.fmt.upper()} file converted to netcdf for date {date}, "
+                     f"term {term}, "
+                     f"domain {domain}.")
+        logger.debug(f"Filepath: {filepath_in_cache}")
 
     def get_file_in_cache(self, filepath):
         """
@@ -303,10 +309,16 @@ class AromeCacheManager:
         filepath_in_cache = self.get_path_file_in_cache(date, term, domain)
         file_is_not_in_cache = not os.path.isfile(filepath_in_cache)
         if file_is_not_in_cache:
+            logger.debug(f"[CACHE MANAGER] {native_variables.name}: "
+                         f"{date}, "
+                         f"term {term}, "
+                         f"domain {domain} NOT in cache")
             self.put_in_cache(date, term, domain)
-            logger.debug(f"[CACHE MANAGER] {native_variables.name}: {date}, term {term}, domain {domain} NOT in cache")
-
-        logger.debug(f"[CACHE MANAGER] {native_variables.name}: {date}, term {term}, domain {domain} already in cache")
+        else:
+            logger.debug(f"[CACHE MANAGER] {native_variables.name}: "
+                         f"{date}, "
+                         f"term {term}, "
+                         f"domain {domain} already in cache")
 
         # Return the file from cache
         dataset = self.get_file_in_cache(filepath_in_cache)
@@ -399,6 +411,7 @@ class ComputedValues:
         self.folderLayout = folderLayout
         self.cache_managers = self._cache_managers(folderLayout, self.computed_vars, autofetch_native)
         self.model = model
+        self.dtype = dtype
 
     @staticmethod
     def str2attrs(model, computed_variables):
@@ -409,23 +422,16 @@ class ComputedValues:
         :param variables: Computed variables names (e.g. "Tair" and not "CLSTEMPERATURE").
         :return: List of model variables.
         """
-        if model == "AROME":
-            model_vars = arome
-        elif model == "PEAROME":
-            model_vars = pearome
-        elif model == "AROME_analysis":
-            model_vars = arome_analysis
-        elif model == "ARPEGE":
-            model_vars = arpege
-        elif model == "ARPEGE_analysis_4dvar":
-            model_vars = arpege_analysis_4dvar
-        elif model == "PEARP":
-            model_vars = pearp
-        else:
-            raise NotImplementedError(f"{model} is not implemented. Current model available are:"
-                                      f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', "
-                                      f"'PEARP'")
-        return [getattr(model_vars, variable) for variable in computed_variables]
+        logger.info(f"Asked for model: {model}. Models available:"
+                    f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
+
+        # isinstance(globals(), dict) == True
+        # Look at all variables, and class instances imported and select the one corresponding to the model
+        model_vars = globals()[model.lower()]
+
+        # If we need surface variables, the model becomes a list of native models (e.g. AROME = AROME + SURFEX)
+        model_and_submodels = [getattr(model_vars, variable) for variable in computed_variables]
+        return model_and_submodels
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):
         """
@@ -463,7 +469,7 @@ class ComputedValues:
     # old save_final_netcd
     def _concat_files_and_save_netcdf(self, time_tag, member, domain):
         """
-        Save computed files to netcdf in _computed_ folder.
+        Save computed files to netcdf in _final_ folder.
 
         :param time_tag: Runtime.
         :param member: Member number.
@@ -473,7 +479,9 @@ class ComputedValues:
             ds = xr.open_mfdataset(self.computed_files[(member, domain)], concat_dim='time')
             if self.dtype == "32bits":
                 ds = ds.astype(np.float32)
-            ds.to_netcdf(self.get_path_file_in_final(time_tag, member, domain))
+            filepath = self.get_path_file_in_final(time_tag, member, domain)
+            ds.to_netcdf(filepath)
+            logger.debug(f"[COMPUTER] Saved file: {filepath}")
         else:
             logger.info(f"[COMPUTER] self.computed_files[(member, domain)] is empty")
 
@@ -570,7 +578,9 @@ class ComputedValues:
 
     def save_computed_vars_to_netcdf(self, filepath_computed, variables_storage):
         """
-        Save computed files (e.g. Winf speed computed from .fa or .grib native files using wind components).
+        Save computed files in _computed_ folder.
+
+        e.g. Wind speed computed from .fa or .grib native files using wind components.
 
         :param filepath_computed: File path to save data.
         :param variables_storage: Dictionary where are temporarily stored computed data.
@@ -704,10 +714,13 @@ class ComputedValues:
                 path_file_in_computed = self.get_path_file_in_computed(run, term, member, domain)
                 file_is_already_computed = os.path.isfile(path_file_in_computed)
 
+                member_str = f", member {member}" if member else ""
+                computer_str = f"[COMPUTER] {run}, term {term}, domain {domain}{member_str}"
                 if file_is_already_computed:
+                    logger.debug(f"{computer_str} already computed")
                     self.computed_files[(member, domain)].append(path_file_in_computed)
-                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}, member {member} already in cache")
                 else:
+                    logger.debug(f"{computer_str} NOT computed")
                     # Store computed values before saving to netcdf
                     variables_storage = defaultdict(lambda: [])
 
@@ -715,12 +728,11 @@ class ComputedValues:
                     for computed_var in self.computed_vars:
                         computed_values = self.compute_variables_in_cache(computed_var, member, run, term, domain)
                         variables_storage[computed_var.name] = computed_values
-                        logger.debug(f"[COMPUTER]"
+                        logger.debug(f"[COMPUTER] "
                                      f"{computed_var.name}, "
                                      f"{run}, "
                                      f"term {term}, "
-                                     f"domain {domain}, "
-                                     f"member {member} computed")
+                                     f"domain {domain}{member_str} computed")
                     variables_storage['time'] = validity_date(run, term)
 
                     # Create netcdf file of computed values
@@ -728,6 +740,6 @@ class ComputedValues:
 
                     # Remember that current file is computed
                     self.computed_files[(member, domain)].append(path_file_in_computed)
-                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}, member {member} computed and saved")
+                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}{member_str} computed and saved")
 
             self.delete_native_files()

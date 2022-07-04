@@ -247,7 +247,7 @@ def execute(config_user):
 
     :param config_user: Dictionary containing the configuration as given by the user.
     """
-    logger.info("Start extraction")
+    logger.info("[CONFIG READER] Start extraction")
 
     # Record time
     extraction_starts = datetime.now()
@@ -279,19 +279,19 @@ def execute(config_user):
     previous_date = (c.get("start_date"), c.get("start_term"))
 
     for date_, term in iterator.get_iterator():
-        logger.debug(f"[CONFIG READER] Start {date_}, term {term}")
+        logger.info(f"[CONFIG READER] Start {date_}, term {term}")
         current_date = (date_, term)
         time_tag = grouper.filetag(*previous_date)
 
         # Look if all files (all members and all domains) are already in final folder
         if computer.files_are_in_final(time_tag):
-            logger.debug(f"[CONFIG READER] File {date_}, term {term}, already in final")
+            logger.info(f"[CONFIG READER] File {date_}, term {term}, already in final")
             continue
         else:
             if grouper.batch_is_complete(previous_date, current_date):
                 computer.concat_and_clean_computed_folder(time_tag)
                 computer.clean_cache_folder()
-                logger.debug(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
+                logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
 
             retry_and_finally_raise(
                 onRetry=send_problem_extraction_email(config_user),
