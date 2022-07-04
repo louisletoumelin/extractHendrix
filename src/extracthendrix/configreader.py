@@ -4,13 +4,15 @@ import time as timeutils
 import os
 import logging
 import glob
+import uuid
 
 from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
 
-logging.getLogger("footprints").disabled = True
-logging.getLogger('vortex').disabled = True
+logging.getLogger("footprints").setLevel("CRITICAL")
+logging.getLogger('vortex').setLevel("CRITICAL")
+logging.getLogger('epygram').setLevel("CRITICAL")
 logging.basicConfig(level=logging.DEBUG,
                     handlers=[logging.StreamHandler()],
                     format='\n[%(asctime)s][%(name)s][%(levelname)s]%(message)s')
@@ -82,7 +84,7 @@ def retry_and_finally_raise(
 
 class Grouper:
     """
-    Handles grouping of downladed files (daily, monthly...etc)
+    Handles grouping of downloaded files (daily, monthly...etc)
 
     Takes care of grouping file according to the user demands, whenever the files are downloaded.
     This is better than concatenating files at the end because of lower file redundance and memory footprint.
@@ -136,6 +138,7 @@ class TimeIterator:
 
     1. Iterate on terms with runtime fixed for forecast.
     2. Iterate on runtime with term fixed for analysis.
+    3. Iterate on runtime and terms for 4dvar.
     """
     def __init__(self, config_user):
         """
@@ -216,8 +219,8 @@ def check_config_user(config_user):
     group_results_as_time_series = config_user["groupby"][0] == 'timeseries'
     model_is_in_forecast_mode = not "analysis" in config_user["model"]
     if group_results_as_time_series and model_is_in_forecast_mode:
-        str_raise = "In mode time series, between duration between terms must be 24h"
-        assert config_user["end_term"] - config_user["start_term"] == 24, str_raise
+        str_raise = "In mode time series, config_user['end_term'] - config_user['start_term'] must be 23h"
+        assert (config_user["end_term"] - config_user["start_term"] + 1) == 24, str_raise
 
     return config_user
 
@@ -232,15 +235,15 @@ def execute(config_user):
             work_folder="/home/letoumelinl/develop/examples/",
             model="AROME",
             domain=["alp", "switzerland"],
-            variables=["SWE"],
+            variables=["Tair", "SWE"],
             email_address="louis.letoumelin@meteo.fr",
             start_date=datetime(2022, 6, 26),
-            end_date=datetime(2022, 6, 26),
+            end_date=datetime(2022, 6, 28),
             groupby=('timeseries', 'daily'),
             run=0,
             delta_t=1,
             start_term=6,
-            end_term=30)
+            end_term=29)
 
     :param config_user: Dictionary containing the configuration as given by the user.
     """
@@ -267,24 +270,28 @@ def execute(config_user):
         computed_vars=c.variables,
         autofetch_native=True,
         model=c.model,
-        members=c.get("members", [None]))
+        members=c.get("members", [None]),
+        dtype=c.get("dtype"))
 
     # Time iterator
     iterator = TimeIterator(config_user)
 
     previous_date = (c.get("start_date"), c.get("start_term"))
+
     for date_, term in iterator.get_iterator():
+        logger.debug(f"[CONFIG READER] Start {date_}, term {term}")
         current_date = (date_, term)
         time_tag = grouper.filetag(*previous_date)
 
         # Look if all files (all members and all domains) are already in final folder
         if computer.files_are_in_final(time_tag):
-            logger.debug(f"File {date_}, term {term}, already in cache")
+            logger.debug(f"[CONFIG READER] File {date_}, term {term}, already in final")
             continue
         else:
             if grouper.batch_is_complete(previous_date, current_date):
                 computer.concat_and_clean_computed_folder(time_tag)
                 computer.clean_cache_folder()
+                logger.debug(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
 
             retry_and_finally_raise(
                 onRetry=send_problem_extraction_email(config_user),
@@ -309,7 +316,7 @@ def execute(config_user):
     # Email
     send_success_email(config_user)(extraction_ends, extraction_ends - extraction_starts)
 
-    logger.info("Extraction finished")
+    logger.info("[CONFIG READER] Extraction finished")
 
 
 def get_prestaging_file_list(config_user, layout):
@@ -352,13 +359,14 @@ def prestage(config_user):
 
     c = DictNamespace(config_user)
 
-    layout = FolderLayout(work_folder=c.work_folder, create_layout=False)
+    layout = FolderLayout(work_folder=c.work_folder, create_subfolders=False)
 
     listfiles, _ = get_prestaging_file_list(config_user, layout)
     name_str = config_user["email_address"].split("@")[0].replace('.', '_')
     begin_str = config_user["start_date"].strftime("%m_%d_%Y")
     end_str = config_user["end_date"].strftime("%m_%d_%Y")
-    name_txt_file = f"prestaging_{name_str}_{c.model}_begin_{begin_str}_end_{end_str}.txt"
+    id_ = str(uuid.uuid1())[:5]
+    name_txt_file = f"prestaging_{name_str}_{c.model}_begin_{begin_str}_end_{end_str}_ID_{id_}.txt"
     filepath = os.path.join(layout.work_folder, name_txt_file)
 
     with open(filepath, 'w') as fp:

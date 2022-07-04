@@ -1,5 +1,10 @@
 import numpy as np
 from bronx.meteo.thermo import Thermo
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 """
 Here are defined post processing functions.
@@ -35,7 +40,7 @@ def compute_temperature_in_degree_c(read_cache, date, term, domain, native_varia
     return read_cache(date, term, domain, native_variable) - 273.15
 
 
-def compute_decumul(read_cache, date, term, domain, native_variable):
+def compute_decumul(read_cache, date, term, domain, native_variable, time_delta=3600):
     """
     convert absolute temperature to degrees C.
     :param read_cache: read cache method from cache manager
@@ -44,7 +49,8 @@ def compute_decumul(read_cache, date, term, domain, native_variable):
     :param native_variable: temperature in K
     :return: temperature in degrees C
     """
-    return read_cache(date, term, domain, native_variable) - read_cache(date, term-1, domain, native_variable)
+    diff = read_cache(date, term, domain, native_variable) - read_cache(date, term-1, domain, native_variable)
+    return diff / time_delta
 
 
 def compute_t_r_p2qv(read_cache, date, term, domain, temperature, rh, pressure):
@@ -142,7 +148,7 @@ def joule2watt_hourly(read_cache, date, term, domain, var):
 
 def compute_decumul_and_negative(read_cache, date, term, domain, native_variable, time_delta=3600):
     delta = compute_decumul(read_cache, date, term, domain, native_variable)
-    return -delta / time_delta
+    return -delta
 
 
 def compute_psurf(read_cache, date, term, domain, native_variable):
@@ -160,8 +166,8 @@ def compute_snowfall(read_cache, date, term, domain, native_name_snow, native_na
 
 
 def compute_decumul_and_diff(read_cache, date, term, domain, native_name_1, native_name_2):
-    var1 = read_cache(date, term, domain, native_name_1)
-    var2 = read_cache(date, term, domain, native_name_2)
+    var1 = compute_decumul(read_cache, date, term, domain, native_name_1)
+    var2 = compute_decumul(read_cache, date, term, domain, native_name_2)
     return var1 - var2
 
 

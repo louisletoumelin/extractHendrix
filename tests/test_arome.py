@@ -1,9 +1,13 @@
 import pytest
+import numpy as np
+import xarray as xr
+
 from extracthendrix.readers import AromeHendrixReader, NativeFileUnfetchedException
 from extracthendrix.generic import AromeCacheManager
 from extracthendrix.generic import FolderLayout
 from extracthendrix.configreader import execute, prestage
 import extracthendrix.config.variables.arome_native as an
+
 import os
 import shutil
 from datetime import date, time, datetime
@@ -104,7 +108,7 @@ def test_config_arome():
         run=0,
         delta_t=1,
         start_term=6,
-        end_term=30
+        end_term=29
     )
 
     execute(config_user)
@@ -163,7 +167,7 @@ def test_config_arpege():
         run=0,
         delta_t=1,
         start_term=6,
-        end_term=30
+        end_term=29
     )
 
     execute(config_user)
@@ -195,7 +199,7 @@ def test_arpege_analysis_4dvar():
         groupby=('timeseries', 'daily'),
         delta_t=1,
         start_term=6,
-        end_term=30)
+        end_term=29)
 
     execute(config_user)
 
@@ -227,7 +231,7 @@ def test_pearp():
         run=0,
         delta_t=1,
         start_term=6,
-        end_term=30,
+        end_term=29,
         members=[1, 2])
 
     execute(config_user)
@@ -259,7 +263,7 @@ def test_prestaging():
         run=0,
         delta_t=1,
         start_term=6,
-        end_term=30
+        end_term=29
     )
 
     prestage(config_user)
@@ -272,3 +276,60 @@ def test_prestaging():
         shutil.rmtree(path_to_file, ignore_errors=True)
 
     assert any(results)
+
+
+"""
+@pytest.mark.skip(reason="fetching on Hendrix takes too long, run this test occasionally")
+def test_same_result_as_previous_extraction():
+    # This test is long tu run and requires file already downloaded. 
+    # It checks tha new extractions are similar to old ones.
+    
+    for file in os.listdir(test_folder):
+        path_to_file = os.path.join(test_folder, file)
+        shutil.rmtree(path_to_file, ignore_errors=True)
+
+    config_user = dict(
+        work_folder="/home/letoumelinl/develop/test4/folder0/",
+        model="AROME",
+        domain=["alp"],
+        variables=['Tair', 'T1', 'ts', 'Tmin', 'Tmax', 'Qair', 'Q1', 'RH2m', 'Wind', 'Wind_Gust', 'Wind_DIR',
+                   'PSurf', 'ZS', 'BLH', 'Rainf', 'Snowf', 'LWdown', 'LWnet', 'DIR_SWdown', 'SCA_SWdown',
+                   'SWnet', 'SWD', 'SWU', 'LHF', 'SHF', 'CC_cumul', 'CC_cumul_low', 'CC_cumul_middle',
+                   'CC_cumul_high', 'Wind90', 'Wind87', 'Wind84', 'Wind75', 'TKE90', 'TKE87', 'TKE84', 'TKE75',
+                   'TT90', 'TT87', 'TT84', 'TT75', 'SWE', 'snow_density', 'snow_albedo', 'vegetation_fraction'],
+        email_address="louis.letoumelin@meteo.fr",
+        start_date=datetime(2020, 1, 1),
+        end_date=datetime(2020, 1, 1),
+        groupby=('timeseries', 'daily'),
+        run=0,
+        delta_t=1,
+        start_term=6,
+        end_term=29)
+
+    execute(config_user)
+
+    # old extraction
+    o = xr.open_dataset("/cnrm/cen/users/NO_SAVE/letoumelinl/AROME/bias_correction/alp/month/AROME_alp_2020_1.nc")
+    
+    # to change
+    filepath = "/home/letoumelinl/develop/test4/folder0/folder0/HendrixExtraction_2022_07_04_10_ID_6476d/alp/"
+    
+    for file in os.listdir(filepath):
+        o = o.sel(time=~o.get_index("time").duplicated())
+        n = xr.open_dataset(file)
+        n = n.sel(time=~n.get_index("time").duplicated())
+
+        try:
+            n1, o1 = xr.align(n, o)
+        except ValueError:
+            print("ValueError", file)
+            continue
+            
+        for variable in n1:
+            if variable in o1:
+                print(variable)
+                for time in n1.time.values:
+                    diff = np.max(np.abs(n1[variable].sel(time=time).values - o1[variable].sel(time=time).values))
+        
+                    assert diff > 0.01
+"""

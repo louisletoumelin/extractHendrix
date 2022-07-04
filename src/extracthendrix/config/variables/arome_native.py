@@ -40,4 +40,5 @@ module = sys.modules[__name__]
 for name in vars:
     alternative_names = alternatives_names_fa.get(name)
     native_var = NativeVariable(model_name=model, name=name, alternative_names=alternative_names)
-    setattr(module, name.replace('.', '__').replace(' ', '__'), native_var)  # Replace '.' in names by '__'
+    name = name.replace('.', '__').replace(' ', '__')  # Replace '.' in names by '__' and ' ' by '__'
+    setattr(module, name, native_var)

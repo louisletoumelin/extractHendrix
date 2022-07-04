@@ -29,10 +29,9 @@ class FolderLayout:
     :type work_folder: str
     """
 
-    def __init__(self, work_folder, create_layout=True):
+    def __init__(self, work_folder, create_subfolders=True):
         self.work_folder = work_folder
-        if create_layout:
-            self.create_layout()
+        self.create_layout(create_subfolders)
 
     @staticmethod
     def create_folder_if_doesnt_exist(path):
@@ -46,7 +45,7 @@ class FolderLayout:
         except FileExistsError:
             print(f"Folder {path} already exists")
 
-    def create_layout(self):
+    def create_layout(self, create_subfolders=True):
         """
         Creates folder and subfolders for the current extraction
 
@@ -60,9 +59,10 @@ class FolderLayout:
         self.create_folder_if_doesnt_exist(self.work_folder)
 
         # Subfolders
-        for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
-            setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
-            self.create_folder_if_doesnt_exist(getattr(self, subfolder))
+        if create_subfolders:
+            for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
+                setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
+                self.create_folder_if_doesnt_exist(getattr(self, subfolder))
 
     def clean_layout(self):
         """Removes subfolders in work_folder"""
@@ -170,15 +170,16 @@ class AromeCacheManager:
                         variable = alternatives_names.pop(0)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
-                        logger.warning(f"Found an alternative name for {initial_name} that works: {variable}")
+                        logger.info(f"[CACHE MANAGER] Aternative name for {initial_name.name} works: {variable}")
                         return field
                     except AssertionError:
-                        logger.warning(f"Alternative name {variable} didn't work for variable {initial_name}")
+                        logger.info(f"[CACHE MANAGER] Alternative name {variable} "
+                                    f"didn't work for variable {initial_name.name}")
                         pass
-                logger.error(f"We coulnd't find correct alternative names for {initial_name}")
+                logger.error(f"[CACHE MANAGER] No correct alternative names for {initial_name}")
                 raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
             else:
-                logger.error(f"We couldn't read {initial_name}")
+                logger.error(f"[CACHE MANAGER] We couldn't read {initial_name}")
                 raise CanNotReadEpygramField(f"We couldn't read {initial_name}")
 
     @staticmethod
@@ -246,7 +247,7 @@ class AromeCacheManager:
                 field.sp2gp()
             field = self.extract_subgrid(field, domain)
             output_resource.writefield(field)
-        logger.debug(f" .fa or .grib file converted to netcdf for date {date}, term {term} and domain {domain}")
+        logger.debug(f"[CACHE MANAGER] .fa or .grib file converted to netcdf for date {date}, term {term} and domain {domain}")
 
     def get_file_in_cache(self, filepath):
         """
@@ -303,7 +304,9 @@ class AromeCacheManager:
         file_is_not_in_cache = not os.path.isfile(filepath_in_cache)
         if file_is_not_in_cache:
             self.put_in_cache(date, term, domain)
-            logger.debug(f"File {date}, term {term}, domain {domain} already in cache")
+            logger.debug(f"[CACHE MANAGER] {native_variables.name}: {date}, term {term}, domain {domain} NOT in cache")
+
+        logger.debug(f"[CACHE MANAGER] {native_variables.name}: {date}, term {term}, domain {domain} already in cache")
 
         # Return the file from cache
         dataset = self.get_file_in_cache(filepath_in_cache)
@@ -371,7 +374,8 @@ class ComputedValues:
             computed_vars=[],
             autofetch_native=False,
             members=[None],
-            model=None
+            model=None,
+            dtype=None,
     ):
         """
         :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
@@ -467,9 +471,11 @@ class ComputedValues:
         """
         if self.computed_files[(member, domain)]:
             ds = xr.open_mfdataset(self.computed_files[(member, domain)], concat_dim='time')
+            if self.dtype == "32bits":
+                ds = ds.astype(np.float32)
             ds.to_netcdf(self.get_path_file_in_final(time_tag, member, domain))
         else:
-            print(f"self.computed_files[(member, domain)] is empty")
+            logger.info(f"[COMPUTER] self.computed_files[(member, domain)] is empty")
 
     def _delete_and_forget_computed_files(self, member, domain):
         """
@@ -562,8 +568,7 @@ class ComputedValues:
         """Gives model name given computed variable (e.g. 'Tair' and not 'CLSTEMPERATURE')"""
         return computed_var.native_vars[0].model_name
 
-    @staticmethod
-    def save_computed_vars_to_netcdf(filepath_computed, variables_storage):
+    def save_computed_vars_to_netcdf(self, filepath_computed, variables_storage):
         """
         Save computed files (e.g. Winf speed computed from .fa or .grib native files using wind components).
 
@@ -573,7 +578,10 @@ class ComputedValues:
         computed_dataset = xr.Dataset({variable_name: variable_data
                                        for variable_name, variable_data in variables_storage.items()})
         computed_dataset = computed_dataset.expand_dims(dim='time').set_coords('time')
+        if self.dtype == "32bits":
+            computed_dataset = computed_dataset.astype(np.float32)
         computed_dataset.to_netcdf(filepath_computed)
+        logger.debug(f"[COMPUTER] Saved file: {filepath_computed}")
 
     def _move_files_to_domain_folders(self):
         """Move files from _final_ folder to a domain specific foilder (e.g; "alps/") when computations are finished."""
@@ -676,6 +684,8 @@ class ComputedValues:
             ds["FRC_TIME_STP"] = 3600
 
             # Save file to netcdf
+            if self.dtype == "32bits":
+                ds = ds.astype(np.float32)
             ds.to_netcdf(filename.split(".nc")[0]+"_tmp.nc", unlimited_dims={"time": True})
             os.remove(filename)
             os.rename(filename.split(".nc")[0]+"_tmp.nc", filename)
@@ -696,7 +706,7 @@ class ComputedValues:
 
                 if file_is_already_computed:
                     self.computed_files[(member, domain)].append(path_file_in_computed)
-                    logger.debug(f"File {run}, term {term}, domain {domain}, member {member} already in cache")
+                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}, member {member} already in cache")
                 else:
                     # Store computed values before saving to netcdf
                     variables_storage = defaultdict(lambda: [])
@@ -705,6 +715,12 @@ class ComputedValues:
                     for computed_var in self.computed_vars:
                         computed_values = self.compute_variables_in_cache(computed_var, member, run, term, domain)
                         variables_storage[computed_var.name] = computed_values
+                        logger.debug(f"[COMPUTER]"
+                                     f"{computed_var.name}, "
+                                     f"{run}, "
+                                     f"term {term}, "
+                                     f"domain {domain}, "
+                                     f"member {member} computed")
                     variables_storage['time'] = validity_date(run, term)
 
                     # Create netcdf file of computed values
@@ -712,5 +728,6 @@ class ComputedValues:
 
                     # Remember that current file is computed
                     self.computed_files[(member, domain)].append(path_file_in_computed)
+                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}, member {member} computed and saved")
 
             self.delete_native_files()
