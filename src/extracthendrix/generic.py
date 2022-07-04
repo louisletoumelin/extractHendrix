@@ -250,7 +250,7 @@ class AromeCacheManager:
                 field.sp2gp()
             field = self.extract_subgrid(field, domain)
             output_resource.writefield(field)
-        logger.debug(f"[CACHE MANAGER] {self.extractor.fmt.upper()} file converted to netcdf for date {date}, "
+        logger.debug(f"[CACHE MANAGER] {self.extractor.fmt.upper()} file extracted and saved in cache for date {date}, "
                      f"term {term}, "
                      f"domain {domain}.")
         logger.debug(f"Filepath: {filepath_in_cache}")

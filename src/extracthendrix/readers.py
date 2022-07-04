@@ -402,12 +402,15 @@ class AromeHendrixReader(HendrixFileReader):
         if not autofetch:
             raise NativeFileUnfetchedException()
 
-        # Try every combinations od resource description possible
+        # Try every combinations of resource description possible
         # resource description = model description in Vortex
         last_exception = None
+        logger.info("[EXTRACTOR] Downloading native file ...")
         for resource_description in self._get_vortex_resource_description(date, term):
             try:
                 r = usevortex.get_resources(getmode='epygram', **resource_description)
+                logger.info("[EXTRACTOR] Downloading finished.")
+                logger.info(f"[EXTRACTOR] Filepath: {filepath}.")
                 return filepath
             except Exception as e:
                 last_exception = e
