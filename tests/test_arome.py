@@ -159,7 +159,7 @@ def test_config_arpege():
         work_folder=test_folder,
         model="ARPEGE",
         domain=["alp", "switzerland"],
-        variables=["Tair"],
+        variables=["Tair", "Wind", "SWE"],
         email_address="louis.letoumelin@meteo.fr",
         start_date=datetime(2022, 6, 26),
         end_date=datetime(2022, 6, 27),

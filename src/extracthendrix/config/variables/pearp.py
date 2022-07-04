@@ -23,3 +23,4 @@ vars = {
 module = sys.modules[__name__]
 for name in vars:
     setattr(module, name, Variable(**vars[name], name=name))
+setattr(module, "vars", vars)

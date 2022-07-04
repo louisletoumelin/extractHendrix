@@ -5,10 +5,13 @@ import os
 import logging
 import glob
 import uuid
+from pprint import pprint
 
 from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
+from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar, pearp
+from extracthendrix.config.domains import domains_descriptions
 
 logging.getLogger("footprints").setLevel("CRITICAL")
 logging.getLogger('vortex').setLevel("CRITICAL")
@@ -414,3 +417,37 @@ def documentation():
     print_link_to_hendrix_documentation()
     print_link_to_confluence_table_with_downloaded_data()
     print_link_to_arome_variables()
+
+
+def help_model():
+    print(f"Models availables: 'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
+
+
+def help_variables(model):
+    model_vars = globals()[model.lower()]
+    dict_vars = model_vars.vars
+    print(dict_vars)
+    for key in dict_vars:
+        dict_vars[key]['native_model'] = [native_var.model_name for native_var in dict_vars[key]['native_vars']]
+        dict_vars[key]['alternative_names'] = [native_var.alternative_names for native_var in dict_vars[key]['native_vars']]
+        dict_vars[key]['native_vars'] = [native_var.name for native_var in dict_vars[key]['native_vars']]
+    pprint(dict_vars)
+
+
+def help_domain():
+    print("A domain can be defined by coordinates (lat/lon) or indices on the grid of the model. "
+          "Indices are only valid for AROME and AROME_SURFACE for the moment."
+          "\nIf indices and coordinates are given, indices will be prioritized.\n")
+    print("\nConfig user refers to names in the following dictionary:")
+    pprint(domains_descriptions)
+
+
+def help_groupby():
+    print("Handles grouping of downloaded files (daily, monthly...etc). "
+          "Takes care of grouping file according to the user demands, whenever the files are downloaded.")
+    print("\nIn order to regroup extracted netcdf files by day (e.g. 01/01/2020, 02/01/2020, ... ) or by "
+          "month (e.g. January 2020)")
+    print("groupby=('timeseries', 'monthly') or groupby=('timeseries', 'daily')")
+    print("\nIn order tor group extracted netcdf files by runtime (mandatory for extracting more than 24hr / runtime) "
+          "e.g. Run of 01/01/2020 00:00 + 30 forecast leadtimes")
+    print("groupby=('forecast',)")
