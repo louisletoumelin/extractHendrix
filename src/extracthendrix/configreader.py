@@ -289,9 +289,9 @@ def execute(config_user):
             continue
         else:
             if grouper.batch_is_complete(previous_date, current_date):
+                logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
                 computer.concat_and_clean_computed_folder(time_tag)
                 computer.clean_cache_folder()
-                logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
 
             retry_and_finally_raise(
                 onRetry=send_problem_extraction_email(config_user),
@@ -302,6 +302,7 @@ def execute(config_user):
             previous_date = (date_, term)
 
     last_time_tag = grouper.filetag(*previous_date)
+    logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
     computer.concat_and_clean_computed_folder(last_time_tag)
     computer.clean_cache_folder()
 
