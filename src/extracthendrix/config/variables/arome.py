@@ -63,9 +63,6 @@ vars = {
     # Humidity
     #
 
-    # todo 1/3: Isabelle used the prognostic humidity and stored it in Qair. Now prognostic humidity is Q1. We
-    # 2/3: should create a function that put the values of Q1 inside Qair when the user desires
-    # 3/3: prognostic humidity to force SURFEX
     'Qair':
         dict(native_vars=[an.CLSHUMI__SPECIFIQ],
              compute=copy,
@@ -203,7 +200,7 @@ vars = {
     'LHF':
         dict(native_vars=[an.SURFFLU__LAT__MEVA, an.SURFFLU__LAT__MSUB],
              compute=compute_latent_heat_flux,
-             original_long_name="LHF =SURFFLU.LAT.MEVA' + 'SURFFLU.LAT.MSUB'"),
+             original_long_name="LHF = -('SURFFLU.LAT.MEVA' + 'SURFFLU.LAT.MSUB')"),
     'SHF':
         dict(native_vars=[an.SURFFLU__CHA__SENS],
              compute=compute_decumul_and_negative,

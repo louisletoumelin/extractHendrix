@@ -1,5 +1,5 @@
 """
-copy past from Iabelle code (and some modifications such as deleting commentaries)
+copy past from Isabelle code (and some modifications such as deleting commentaries)
 """
 
 
