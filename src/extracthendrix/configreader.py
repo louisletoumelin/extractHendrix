@@ -358,16 +358,22 @@ def prestage(config_user):
     """
 
     config_user = check_config_user(config_user)
-
     c = DictNamespace(config_user)
-
     layout = FolderLayout(work_folder=c.work_folder, create_subfolders=False)
-
     listfiles, _ = get_prestaging_file_list(config_user, layout)
-    name_str = config_user["email_address"].split("@")[0].replace('.', '_')
+
+    # Get name from email
+    name_str = config_user["email_address"].split("@")[0]
+    name_str = name_str.replace('.', '_')
+
+    # Str for name prestaging.txt
     begin_str = config_user["start_date"].strftime("%m_%d_%Y")
     end_str = config_user["end_date"].strftime("%m_%d_%Y")
+
+    # Unique ID
     id_ = str(uuid.uuid1())[:5]
+
+    # Filepath
     name_txt_file = f"prestaging_{name_str}_{c.model}_begin_{begin_str}_end_{end_str}_ID_{id_}.txt"
     filepath = os.path.join(layout.work_folder, name_txt_file)
 
@@ -418,10 +424,12 @@ def documentation():
 
 
 def help_model():
+    """Helping function for model keyword in config_user"""
     print(f"Models availables: 'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
 
 
 def help_variables(model):
+    """Helping function for variables keyword in config_user"""
     model_vars = globals()[model.lower()]
     dict_vars = model_vars.vars
     print(dict_vars)
@@ -433,6 +441,7 @@ def help_variables(model):
 
 
 def help_domain():
+    """Helping function for domain keyword in config_user"""
     print("A domain can be defined by coordinates (lat/lon) or indices on the grid of the model. "
           "Indices are only valid for AROME and AROME_SURFACE for the moment."
           "\nIf indices and coordinates are given, indices will be prioritized.\n")
@@ -441,6 +450,7 @@ def help_domain():
 
 
 def help_groupby():
+    """Helping function for groupby keyword in config_user"""
     print("Handles grouping of downloaded files (daily, monthly...etc). "
           "Takes care of grouping file according to the user demands, whenever the files are downloaded.")
     print("\nIn order to regroup extracted netcdf files by day (e.g. 01/01/2020, 02/01/2020, ... ) or by "
