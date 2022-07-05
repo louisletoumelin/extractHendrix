@@ -25,13 +25,11 @@ logger.setLevel("DEBUG")
 
 def onRetryDefault(exception_raised, time_fail, nb_attempts, time_to_next_retry):
     """Print when retry to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
-    #print(exception_raised, time_fail, nb_attempts, time_to_next_retry)
     logger.warning(exception_raised, time_fail, nb_attempts, time_to_next_retry)
 
 
 def onFailureDefault(exception_raised, current_time):
     """Print when failed to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
-    #print(exception_raised, current_time)
     logger.warning(exception_raised, current_time)
 
 
