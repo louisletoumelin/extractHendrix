@@ -7,24 +7,6 @@ ExtractHendrix is a package to download model outputs on Hendrix as it simplest.
 - **Group:** CEN / CNRM / Météo-France/ CNRS
 
 
-
-Install (on Météo-France network)
-----------------------
-
-    git clone https://git.meteo.fr/cnrm-cen/louisletoumelin/extracthendrix
-
-    pip install extracthendrix
-
-
-Requirements
-----------------------
-- Météo-France packages: epygram, vortex
-
-- General packages: numpy, pandas, xarray
-
-- For testing: pytest
-
-
 Example
 ----------------------
 
@@ -46,6 +28,37 @@ Example
         end_term=29)
 
     execute(config_user)
+
+
+Models supported
+----------------------
+
+- AROME deterministic
+  - forecasts
+  - analysis
+- PEAROME
+- ARPEGE deterministic
+  - forecasts
+  - analysis
+- PEARP
+- S2M (under development)
+
+Install (on Météo-France network)
+----------------------
+
+    git clone https://git.meteo.fr/cnrm-cen/louisletoumelin/extracthendrix
+
+    pip install extracthendrix
+
+
+Requirements
+----------------------
+- Météo-France packages: epygram, vortex
+
+- General packages: numpy, pandas, xarray
+
+- For testing: pytest
+
 
 For developers
 ----------------------
