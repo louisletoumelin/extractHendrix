@@ -28,7 +28,7 @@ config_user = dict(
     email_address="louis.letoumelin@meteo.fr",
 
     # Extraction starts at start_date
-    start_date=datetime(2018, 10, 31), #2019-03-01T06, 2017-09-01T06, swiss 2017-09-01T06, a compléter, pyr 2019-09-01T06, corse 2019-09-01T06
+    start_date=datetime(2018, 10, 31),
 
     # Extraction ends at end_date
     end_date=datetime(2018, 10, 31),
