@@ -8,11 +8,14 @@ ExtractHendrix is a package to download model outputs on Hendrix as it simplest.
 
 
 
-Example
+Install
 ----------------------
 
     pip install extracthendrix
 
+
+Example
+----------------------
 
 
     from extracthendrix import execute
