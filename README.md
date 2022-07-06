@@ -14,6 +14,15 @@ Install
     pip install extracthendrix
 
 
+Requirements
+----------------------
+Météo-France packages: Epygram, Vortex,
+
+General packages: numpy, pandas, xarray
+
+For testing: pytest
+
+
 Example
 ----------------------
 
