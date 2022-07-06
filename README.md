@@ -1,5 +1,41 @@
-# Extraction de données sur Hendrix
+# ExtractHendrix
 
+ExtractHendrix is a package to download model outputs on Hendrix as it simplest.
+
+- **Developers:** Louis Le Toumelin, Hugo Merzisen, Sabine Radanovics
+- **Mails:** louis.letoumelin@meteo.fr, hugo.merzisen@meteo.fr, sabine.radanovics@meteo.fr
+- **Group:** CEN / CNRM / Météo-France/ CNRS
+
+
+
+Example
+----------------------
+
+    pip install extracthendrix
+
+    from extracthendrix import execute
+
+    config_user = dict(
+        work_folder="path/to/my/folder/",
+        model="AROME",
+        domain=["alp", "corsica", "pyr", "switzerland"],
+        variables=['Tair', 'T1', 'ts', 'Tmin', 'Tmax', 'Qair', 'Q1', 'RH2m', 'Wind', 'Wind_Gust', 'Wind_DIR',
+                    'PSurf', 'ZS', 'BLH', 'Rainf', 'Snowf', 'LWdown', 'LWnet', 'DIR_SWdown', 'SCA_SWdown',
+                    'SWnet', 'SWD', 'SWU', 'LHF', 'SHF', 'CC_cumul', 'CC_cumul_low', 'CC_cumul_middle',
+                    'CC_cumul_high', 'Wind90', 'Wind87', 'Wind84', 'Wind75', 'TKE90', 'TKE87', 'TKE84', 'TKE75',
+                    'TT90', 'TT87', 'TT84', 'TT75', 'SWE', 'snow_density', 'snow_albedo', 'vegetation_fraction'],
+        email_address="louis.letoumelin@meteo.fr",
+        start_date=datetime(2018, 10, 31), #2019-03-01T06, 2017-09-01T06, swiss 2017-09-01T06, a compléter, pyr 2019-09-01T06, corse 2019-09-01T06
+        end_date=datetime(2018, 10, 31),
+        groupby=('timeseries', 'daily'),
+        run=0,
+        delta_t=1,
+        start_term=6,
+        end_term=29)
+
+    execute(config_user)
+
+# Extraction de données sur Hendrix
 
 
 ## Contribuer au développement sans (se) faire de sacs de noeuds
