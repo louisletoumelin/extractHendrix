@@ -51,13 +51,13 @@ For developers
 ----------------------
 [FR]
 
-## Contribuer au développement sans (se) faire de sacs de noeuds
+#### Contribuer au développement sans (se) faire de sacs de noeuds
 
 Le code est fait pour tourner sur un serveur toulousain ayant accès à Hendrix - en pratique pour nous c'est *sxcen*.
 
 Il est pertinent, si d'autres codes utilisent extracthendrix pour la lecture des données, d'avoir deux versions de *extracthendrix* sur *sxcen*, une version "de production" et une version "de développement", afin d'éviter de casser les codes dépendant de la librairie lorsqu'on développe (Hugo: je parle d'expérience...).
 
-### Exemple de la configuration de Hugo sur sxcen
+#### Exemple de la configuration de Hugo sur sxcen
 
 Sur mon compte, la production de figures pour Sytron s'appuie sur extracthendrix pour la lecture des fichiers de la chaîne S2M option sytron, cette production est lancée tous les jours à heures fixes par un cron. Je veux pouvoir développer sur extracthendrix sans prendre le risque de casser cette production, et de ne mettre à jour cette production de fichiers Sytron pour utiliser la dernière version d'extracthendrix que lorsque je le décide.
 
