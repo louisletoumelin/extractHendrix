@@ -16,11 +16,11 @@ Install
 
 Requirements
 ----------------------
-Météo-France packages: Epygram, Vortex,
+- Météo-France packages: epygram, vortex
 
-General packages: numpy, pandas, xarray
+- General packages: numpy, pandas, xarray
 
-For testing: pytest
+- For testing: pytest
 
 
 Example
