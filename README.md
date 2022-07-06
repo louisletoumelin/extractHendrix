@@ -8,8 +8,10 @@ ExtractHendrix is a package to download model outputs on Hendrix as it simplest.
 
 
 
-Install
+Install (on Météo-France network)
 ----------------------
+
+    git clone https://git.meteo.fr/cnrm-cen/louisletoumelin/extracthendrix
 
     pip install extracthendrix
 
