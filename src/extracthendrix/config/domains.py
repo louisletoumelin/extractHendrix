@@ -1,11 +1,14 @@
 import numpy as np
 
 """
-A domain can be defined by coordinates (lat/lon) or indices on the grid of the model
-If indices are given, they will be prioritized.
+A domain can be defined by coordinates (lat/lon) or indices on the grid of the model.
+
+Indices are only valid for AROME and AROME_SURFACE for the moment.
+
+If indices and coordinates are given, indices will be prioritized.
 """
 
-domains = {
+domains_descriptions = {
         # alp
         'alp': {'first_i': np.intp(900), 'last_i': np.intp(1075), 'first_j': np.intp(525), 'last_j': np.intp(750),
                 'lon_llc': 5.0144, 'lat_llc': 43.88877, 'lon_urc': 8.125426, 'lat_urc': 46.395446},

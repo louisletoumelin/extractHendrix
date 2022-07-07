@@ -8,12 +8,12 @@ config_user = dict(
     work_folder="/cnrm/cen/users/NO_SAVE/merzisenh/pourisabelle2",
     domain="alp",
     variables=[ar.SWE],
-    email_adress="hugo.merzisen@meteo.fr",
+    email_address="hugo.merzisen@meteo.fr",
     start_date=datetime(2022, 6, 21),
     end_date=datetime(2022, 6, 23),
     groupby=('timeseries', 'daily'),
-    analysis_hour=0,
-    delta_terms=6,
+    run=0,
+    delta_t=6,
     start_term=6,
     end_term=30
 )
@@ -36,3 +36,6 @@ execute(config_user)
 #     current_time=datetime(2022, 2, 2, 2),
 #     exception = Exception('PAF')
 #     )
+
+
+

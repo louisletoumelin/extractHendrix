@@ -15,9 +15,10 @@ class Variable:
 
 class NativeVariable:
 
-    def __init__(self, model_name=None, name=None, outname=None):
+    def __init__(self, model_name=None, name=None, outname=None, alternative_names=None):
         self.model_name = model_name
         self.name = name
+        self.alternative_names = alternative_names
         if outname:
             self.outname = outname
         else:

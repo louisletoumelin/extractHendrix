@@ -2,12 +2,8 @@ import logging
 from datetime import timedelta, time, datetime, date
 import itertools
 import os
-import shutil
-import copy
 import configparser
 import pkg_resources
-import functools
-import time as timeutils
 
 import ftplib
 from ftplib import FTP
@@ -17,11 +13,8 @@ from cen.layout.nodes import S2MTaskMixIn
 from vortex import toolbox
 import xarray as xr
 import usevortex
-import numpy as np
-import epygram
 
-# from extracthendrix.core import get_model_description, CanNotReadEpygramField, CanNotAccessVortexResource
-from extracthendrix.config.config_fa_or_grib2nc import transformations, alternatives_names_fa
+# from extracthendrix.core import get_all_resource_descriptions, CanNotReadEpygramField, CanNotAccessVortexResource
 from extracthendrix.exceptions import RunDoesntExistException, MoreThanOneRunMatchException, GeometryIsMissingException
 
 logger = logging.getLogger(__name__)
@@ -45,20 +38,31 @@ class NativeFileUnfetchedException(Exception):
 def model_ini_to_dict(model_name):
     """Converts config/models.ini into a dictionary"""
     config = configparser.ConfigParser()
-    models_path = pkg_resources.resource_filename(
-        'extracthendrix.config', 'models.ini')
+    models_path = pkg_resources.resource_filename('extracthendrix.config', 'models.ini')
     config.read(models_path)
     dict_model = dict(config[model_name])
     return dict_model
 
 
-def get_model_description(model_name, member=None):
-    """Get vortex description of a model"""
+#  old get_model_description
+def get_all_resource_descriptions(model_name, member=None):
+    """
+
+    Get vortex descriptions of a model.
+
+    If a key of the resource_description changes with time (e.g. namespace), this will result in several
+    resource descriptions
+
+    :param model_name: Model name.
+    :param member: Member number
+    :return: List of model descriptions
+    """
 
     dict_model = model_ini_to_dict(model_name)
 
     for key in dict_model.keys():
         dict_model[key] = dict_model[key].split(',')
+
     if member:
         dict_model['member'] = [member]
 
@@ -69,51 +73,61 @@ def get_model_description(model_name, member=None):
 
 
 class HendrixFileReader:
-    def file_in_cache_path(self, date, term):
-        return os.path.join(
-            self.folderLayout._cache_,
-            self.get_file_hash(date, term)
-        )
+    """This class deals with file on Hendrix."""
 
-    def native_file_path(self, date, term):
-        return os.path.join(
-            self.folderLayout._native_,
-            '.'.join([self.get_file_hash(date, term), self.fmt])
-        )
+    def file_in_cache_path(self, date, term):
+        """Not used"""
+        filepath = self.folderLayout._cache_
+        filename = self.get_file_hash(date, term)
+        return os.path.join(filepath, filename)
+
+    # old native_file_path
+    def get_path_file_in_native(self, date, term):
+        """
+        Return path of the file in _native_ for the corresponding date/term combination.
+
+        :param date: Run time.
+        :param term: Forecast lead time.
+        :return: Path of the file.
+        """
+        filepath = self.folderLayout._native_
+        filename = self.get_file_hash(date, term)
+        filename = f"{filename}.{self.fmt}"
+        return os.path.join(filepath, filename)
 
 
 available_combinations = [
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=3)],
+         run=[time(hour=3)],
          previ=[False],
          member=range(37),
          timerange=zip([timedelta(days=-i) for i in range(2, 5)], [timedelta(days=-i) for i in range(1, 4)])),
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=3)],
+         run=[time(hour=3)],
          previ=[True],
          member=range(37),
          timerange=[(timedelta(days=-1), timedelta(days=4))]
          ),
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=6)],
+         run=[time(hour=6)],
          previ=[False],
          member=range(37),
          timerange=[(timedelta(days=-1), timedelta(days=0))]
          ),
     dict(model=['S2M_PRO'],
-         runtime=[time(hour=6)],
+         run=[time(hour=6)],
          previ=[True],
          member=range(37),
          timerange=[(timedelta(days=0), timedelta(days=4))]
          ),
     dict(model=['S2M_PRO'],
-         runtime=[time(hour=9)],
+         run=[time(hour=9)],
          previ=[True],
          member=range(37),
          timerange=[(timedelta(days=0), timedelta(days=4))]
          ),
     dict(model=['S2M_FORCING', 'S2M_PRO'],
-         runtime=[time(hour=9)],
+         run=[time(hour=9)],
          previ=[False],
          member=range(37),
          timerange=[(timedelta(days=-1), timedelta(days=0))]
@@ -121,9 +135,9 @@ available_combinations = [
 ]
 available_single_combinations = []
 for combination in available_combinations:
-    for (model, runtime, previ, member, timerange) in itertools.product(
+    for (model, run, previ, member, timerange) in itertools.product(
         combination['model'],
-        combination['runtime'],
+        combination['run'],
         combination['previ'],
         combination['member'],
         combination['timerange']
@@ -132,7 +146,7 @@ for combination in available_combinations:
             available_single_combinations.append(
                 dict(
                     model=model,
-                    runtime=runtime,
+                    run=run,
                     previ=previ,
                     member=member,
                     geometry=geometry,
@@ -149,7 +163,7 @@ class S2MArgHelper:
 
     def checkargs(self, kwargs):
         for key in kwargs.keys():
-            if key not in ('model', 'runtime', 'previ', 'member', 'geometry'):
+            if key not in ('model', 'run', 'previ', 'member', 'geometry'):
                 raise ValueError("Clé illégale pour les arguments de S2M")
 
     def add_arg(self, **kwargs):
@@ -193,7 +207,7 @@ class S2MArgHelper:
         """
         run = self.get_params_for_run(term=term)
         rundatetime = datetime.combine(
-            date=date, time=self.s2m_args['runtime'])
+            date=date, time=self.s2m_args['run'])
         datebegin = rundatetime.replace(hour=6) + run['begin']
         dateend = rundatetime.replace(hour=6) + run['end']
         params = dict(
@@ -204,7 +218,7 @@ class S2MArgHelper:
         )
         del params['end']
         del params['begin']
-        del params['runtime']
+        del params['run']
         return params
 
 
@@ -271,7 +285,7 @@ class Config(object):
 class VortexWitchCraftReader(S2MTaskMixIn):
     def __init__(self, filepath=None, model=None, geometry=None, previ=None, member=None, rundatetime=None, datebegin=None, dateend=None):
         self.conf = Config()
-        self.resource_description = get_model_description(model)[0]
+        self.resource_description = get_all_resource_descriptions(model)[0]
         self.resource_description.update(
             cutoff='production' if previ else 'assimilation',
             geometry=geometry,
@@ -290,42 +304,51 @@ class VortexWitchCraftReader(S2MTaskMixIn):
 
 
 class AromeHendrixReader(HendrixFileReader):
+    """This class helps to extract AROME and ARPEGE files on Hendrix"""
     def __init__(self,
                  folderLayout=None,
                  model=None,
-                 runtime=None,
                  member=None,
                  getmode='get',
                  ):
+        """
+        :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
+        :param model: Model name
+        :param member: Member number
+        :param getmode: getmode (for testing purpose)
+        """
         self.folderLayout = folderLayout
         self.getmode = getmode
-        self.runtime = runtime
         self.model_name = model
         self.member = member
-        # ce dernier attribut est une liste, contenant les valeurs possibles des paramètres pour un même modèle (elles peuvent changer!!!)
-        self.model_description_and_alternative_parameters = get_model_description(
-            model, member)
-        self.fmt = self.model_description_and_alternative_parameters[0]['nativefmt']
+        # List with all model descriptions possibles (including alternative parameters such as "namespace")
+        self.list_resource_descriptions = get_all_resource_descriptions(model, member) # old list_model_descriptions
+        self.fmt = self.list_resource_descriptions[0]['nativefmt']  # FA or GRIB
 
     def get_file_hash(self, date, term):
-        hash_ = "{model}-run_{date}T{runtime}-00-00Z-term_{term}h{memberstr}".format(
-            model=self.model_name,
-            date=date.strftime("%Y%m%d"),
-            runtime=self.runtime.strftime("%H"),
-            term=term,
-            memberstr="_mb{member:03d}".format(
-                member=self.member) if self.member else ""
-        )
+        """
+        Return file hash (i.e. part of the filename).
+
+        :param date: Run time.
+        :param term: Forecast lead time.
+        :return: hash (str).
+        """
+        date = date.strftime("%Y%m%d%H")
+        memberstr = f"_mb{self.member:03d}" if self.member else ""
+        term = f"_term{term}" if term is not None else ""
+        hash_ = f"{self.model_name}_run_{date}{term}{memberstr}"
         return hash_
 
     def get_file_list(self, dateandtermiterator):
         ftp = FTP('hendrix.meteo.fr')
         credentials = netrc().authenticators('hendrix')
+        if credentials is None:
+            credentials = netrc().authenticators('hendrix.meteo.fr')
         ftp.login(credentials[0], credentials[2])
         filelist = []
         notfound = []
         for date_, term in dateandtermiterator:
-            resdesc = self._get_vortex_params(date_, term)
+            resdesc = self._get_vortex_resource_description(date_, term)
             potential_locations = [
                 usevortex.get_resources(
                     getmode='locate', **resource_description
@@ -333,42 +356,64 @@ class AromeHendrixReader(HendrixFileReader):
                 for resource_description in resdesc]
             for resource in potential_locations:
                 try:
-                    filelist.append(return_path_if_exists_on_hendrix(
-                        ftp, resource[0].split(':')[1]))
+                    filelist.append(return_path_if_exists_on_hendrix(ftp, resource[0].split(':')[1]))
                 except (ftplib.error_perm, StopIteration):
                     notfound.append(resource[0])
         ftp.close()
         return filelist, notfound
 
-    def _get_vortex_params(self, date, term):
-        params = [dict(
+    def _get_vortex_resource_description(self, date, term):
+        """
+        Prepare resource descriptions for downloading data with Vortex on Hendrix.
+
+        :param date: Run time
+        :param term: Forecast lead time
+        :return: List of resource descriptions.
+        """
+        resource_descriptions = [dict(
             **model_description,
-            date=datetime.combine(date=date, time=self.runtime),
+            date=date,
             term=term
-        ) for model_description in self.model_description_and_alternative_parameters]
+        ) for model_description in self.list_resource_descriptions]
+
         if self.getmode == 'get':
-            for param in params:
-                param['local'] = os.path.join(
-                    self.native_file_path(date, term))
-        return params
+            for resource in resource_descriptions:
+                resource['local'] = os.path.join(self.get_path_file_in_native(date, term))
+
+        return resource_descriptions
 
     def get_native_file(self, date, term, autofetch=True):
         """
+        Download files on Hendrix if necessary.
+
+        :param date: run
+        :param term: forecast lead time
+        :param autofetch:
+        :return: filepath, str
         """
-        filepath = self.native_file_path(date, term)
-        # on vérifie s'il n'existe pas déjà
-        if os.path.isfile(filepath):
+        filepath = self.get_path_file_in_native(date, term)
+
+        # If file is downloaded, we skip
+        file_already_downloaded = os.path.isfile(filepath)
+        if file_already_downloaded:
             return filepath
+
+        # Test purpose
         if not autofetch:
             raise NativeFileUnfetchedException()
+
+        # Try every combinations of resource description possible
+        # resource description = model description in Vortex
         last_exception = None
-        for param in self._get_vortex_params(date, term):
-            # ici au cas ou il y ait plusieurs combinaisons de paramètres vortex
-            # valables à différents instants pour le même modèle, on les
-            # essaie successivement
+        logger.info("[EXTRACTOR] Downloading native file ...")
+        for resource_description in self._get_vortex_resource_description(date, term):
             try:
-                usevortex.get_resources(getmode='epygram', **param)
+                r = usevortex.get_resources(getmode='epygram', **resource_description)
+                logger.info("[EXTRACTOR] Downloading finished.")
+                logger.info(f"[EXTRACTOR] Filepath: {filepath}.")
                 return filepath
             except Exception as e:
                 last_exception = e
+
+        # If not combination works, raise the error
         raise last_exception

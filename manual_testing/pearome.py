@@ -16,7 +16,7 @@ variables_nc=[pearome.Tair, pearome.Qair, pearome.Wind, pearome.Wind_DIR, pearom
 variables = sort_variables_by_model(variables_nc)['PEAROME']
 [var.name['name'] for var in variables]
 
-analysis_hour = 3
+run = 3
 
 date_, term = date(2020,3,1), 1
 
@@ -29,7 +29,7 @@ cache_manager = AromeCacheManager(
     native_files_folder=native_files_folder,
     cache_folder=cache_folder,
     model='PEAROME',
-    runtime=time(hour=analysis_hour),
+    run=time(hour=run),
     delete_native=False,
     member=2
 )
@@ -38,11 +38,11 @@ term=2
 cache_manager.put_in_cache(date_, term)
 
 cache_manager.extractor.get_file_hash(date_, term)
-cache_manager.extractor.model_description_and_alternative_parameters
+cache_manager.extractor.list_model_descriptions
 
 
 
-filepath = cache_manager.get_cache_path(date_,term)
+filepath = cache_manager.get_path_file_in_cache(date_,term)
 
 import xarray as xr
 

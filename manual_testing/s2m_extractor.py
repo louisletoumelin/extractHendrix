@@ -8,7 +8,7 @@ import xarray as xr
 native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
 
 helper = S2MArgHelper(model='S2M_PRO', member=36,
-                      runtime=time(hour=3), geometry='cor')
+                      run=time(hour=3), geometry='cor')
 # helper = S2MArgHelper(model='S2M_PRO', member=35, geometry='cor')
 
 pprint(helper.get_available_runs())

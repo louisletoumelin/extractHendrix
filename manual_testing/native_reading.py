@@ -8,7 +8,7 @@ native_files_folder = "/home/merzisenh/NO_SAVE/extracthendrix/_native_files_"
 reader = AromeHendrixReader(
     native_files_folder=native_files_folder,
     model='AROME',
-    runtime=time(0)
+    run=time(0)
 )
 
 

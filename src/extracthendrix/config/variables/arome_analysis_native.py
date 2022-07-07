@@ -5,13 +5,10 @@ from .utils import NativeVariable
 In this file you will find native variables names in AROME. 
 If you need to implement a new variable, please give the native variable here.
 
-Sometime, the name of a variable can change with time (ex: wind gust).
-Here are alternative names (alternatives_names_fa) to check if first name is not found
-
 See Documentation in arome.py for more details.
 """
 
-model = "AROME"
+model = "AROME_analysis"
 
 vars = ['CLSTEMPERATURE', 'S090TEMPERATURE', 'SURFTEMPERATURE', 'CLSMINI.TEMPERAT', 'CLSMAXI.TEMPERAT',
         'CLSVENT.ZONAL', 'CLSVENT.MERIDIEN', 'CLSU.RAF60M.XFU', 'CLSV.RAF60M.XFU',
@@ -31,14 +28,7 @@ vars = ['CLSTEMPERATURE', 'S090TEMPERATURE', 'SURFTEMPERATURE', 'CLSMINI.TEMPERA
         'S084CLOUD_WATER', 'S084ICE_CRYSTAL', 'S084SNOW', 'S084RAIN',
         'S075CLOUD_WATER', 'S075ICE_CRYSTAL', 'S075SNOW', 'S075RAIN']
 
-
-alternatives_names_fa = {'CLSU.RAF60M.XFU': ['CLSU.RAF.MOD.XFU'],
-                         'CLSV.RAF60M.XFU': ['CLSV.RAF.MOD.XFU'],
-                         'X001ASN_VEG1': ['X001ASN_VEG']}
-
 module = sys.modules[__name__]
 for name in vars:
-    alternative_names = alternatives_names_fa.get(name)
-    native_var = NativeVariable(model_name=model, name=name, alternative_names=alternative_names)
-    name = name.replace('.', '__').replace(' ', '__')  # Replace '.' in names by '__' and ' ' by '__'
-    setattr(module, name, native_var)
+    setattr(module, name.replace('.', '__').replace(' ', '__'),
+            NativeVariable(model_name=model, name=name))
