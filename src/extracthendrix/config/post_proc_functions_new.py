@@ -42,14 +42,16 @@ def compute_temperature_in_degree_c(read_cache, date, term, domain, native_varia
 
 def compute_decumul(read_cache, date, term, domain, native_variable, time_delta=3600):
     """
-    convert absolute temperature to degrees C.
+    The cumulated value of any variable is assumed to be 0 for term 0
     :param read_cache: read cache method from cache manager
     :param date: analysis date
     :param term: forecast term
     :param native_variable: temperature in K
     :return: temperature in degrees C
     """
-    diff = read_cache(date, term, domain, native_variable) - read_cache(date, term-1, domain, native_variable)
+    previous_value = 0 if term == 1 else read_cache(
+        date, term-1, domain, native_variable)
+    diff = read_cache(date, term, domain, native_variable) - previous_value
     return diff / time_delta
 
 
@@ -161,7 +163,8 @@ def compute_zs(read_cache, date, term, domain, native_variable):
 
 def compute_snowfall(read_cache, date, term, domain, native_name_snow, native_name_graupel):
     snow = compute_decumul(read_cache, date, term, domain, native_name_snow)
-    graupel = compute_decumul(read_cache, date, term, domain, native_name_graupel)
+    graupel = compute_decumul(read_cache, date, term,
+                              domain, native_name_graupel)
     return snow + graupel
 
 
@@ -172,8 +175,10 @@ def compute_decumul_and_diff(read_cache, date, term, domain, native_name_1, nati
 
 
 def compute_latent_heat_flux(read_cache, date, term, domain, native_name_1, native_name_2):
-    evaporation = compute_decumul(read_cache, date, term, domain, native_name_1)
-    sublimation = compute_decumul(read_cache, date, term, domain, native_name_2)
+    evaporation = compute_decumul(
+        read_cache, date, term, domain, native_name_1)
+    sublimation = compute_decumul(
+        read_cache, date, term, domain, native_name_2)
     return -(evaporation + sublimation)
 
 
