@@ -7,7 +7,7 @@ import glob
 import uuid
 from pprint import pprint
 
-from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names
+from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names, get_variable_instances
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
 from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar, pearp
@@ -25,7 +25,8 @@ logger.setLevel("DEBUG")
 
 def onRetryDefault(exception_raised, time_fail, nb_attempts, time_to_next_retry):
     """Print when retry to launch extraction after an error has been raised (e.g. problem on Hendrix)."""
-    logger.warning(exception_raised, time_fail, nb_attempts, time_to_next_retry)
+    logger.warning(exception_raised, time_fail,
+                   nb_attempts, time_to_next_retry)
 
 
 def onFailureDefault(exception_raised, current_time):
@@ -45,7 +46,7 @@ def retry_and_finally_raise(
         onRetry=onRetryDefault,
         onFailure=onFailureDefault,
         layout=None,
-        time_retries=[timedelta(hours=0.01)]): #timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]
+        time_retries=[timedelta(hours=0.01)]):  # timedelta(hours=n) for n in [0.5, 1, 2, 3, 6]
     """
     Decorator to retry extraction when an error is raised, until a point where we assume the code failed and raise
     an exception.
@@ -75,9 +76,9 @@ def retry_and_finally_raise(
             except Exception as E:
                 onFailure(E, timeutils.asctime())
                 if layout:
-                    #delete_last_file_in_folder(layout._cache_)
+                    # delete_last_file_in_folder(layout._cache_)
                     delete_last_file_in_folder(layout._computed_)
-                    #delete_last_file_in_folder(layout._native_)
+                    # delete_last_file_in_folder(layout._native_)
                 raise E
         return wrapper_retry
     return decorator_retry
@@ -93,6 +94,7 @@ class Grouper:
     :param groupby: time period to group by outputs files
     :type groupby: str
     """
+
     def __init__(self, groupby):
         self.groupby = groupby
 
@@ -126,6 +128,7 @@ class Grouper:
 
 class DictNamespace:
     """A trick to use attributes instead of dictionary keys"""
+
     def __init__(self, dict_):
         self.__dict__ = dict_
 
@@ -141,6 +144,7 @@ class TimeIterator:
     2. Iterate on runtime with term fixed for analysis.
     3. Iterate on runtime and terms for 4dvar.
     """
+
     def __init__(self, config_user):
         """
         :param config_user: Dictionary containing the configuration as given by the user.
@@ -184,15 +188,15 @@ class TimeIterator:
             yield (current_datetime, self.term)
             current_datetime += timedelta(hours=self.delta_t)
 
-    def dateiterator4dvar(self, synoptic_hour=6):
-        """Iterator for 4dvar analysis"""
-        current_datetime = self.start_date
-        while current_datetime <= self.end_date:
-            hour_analysis = 6 * (current_datetime.hour // synoptic_hour)
-            analysis_date = current_datetime.replace(hour=hour_analysis)
-            term = current_datetime.hour % 6
-            yield (analysis_date, term)
-            current_datetime += timedelta(hours=self.delta_t)
+    def dateiterator4dvar(self):
+        delta_runs = (self.end_term - self.start_term) + 1
+        current_rundate = self.start_date
+        while current_rundate <= self.end_date:
+            current_term = self.start_term
+            while current_term <= self.end_term:
+                yield (current_rundate, current_term)
+                current_term += 1
+            current_rundate += timedelta(hours=delta_runs)
 
     def get_iterator(self):
         """Return the appropriate iterator given a model name"""
@@ -221,9 +225,94 @@ def check_config_user(config_user):
     model_is_in_forecast_mode = not "analysis" in config_user["model"]
     if group_results_as_time_series and model_is_in_forecast_mode:
         str_raise = "In mode time series, config_user['end_term'] - config_user['start_term'] must be 23h"
-        assert (config_user["end_term"] - config_user["start_term"] + 1) == 24, str_raise
+        assert (config_user["end_term"] -
+                config_user["start_term"] + 1) == 24, str_raise
 
     return config_user
+
+# send_problem_extraction_email(config_user)
+
+
+def _execute(
+        timeiterator,
+        onRetry,
+        onFailure,
+        onSuccess,
+        work_folder=None,
+        groupby=None,
+        domain=None,
+        variables=[],
+        model=None,
+        members=[None],
+        dtype='32bits'
+):
+    logger.info("[CONFIG READER] Start extraction")
+
+    # Record time
+    extraction_starts = datetime.now()
+
+    # Create folder and subfolders
+    layout = FolderLayout(work_folder=work_folder)
+
+    # Initialize grouper
+    grouper = Grouper(groupby)
+
+    # Initialize computer
+    computer = ComputedValues(
+        layout,
+        domain=domain,
+        computed_vars=variables,
+        autofetch_native=True,
+        model=model,
+        members=members,
+        dtype=dtype
+    )
+
+    previous_date = None
+
+    for date_, term in timeiterator:
+        logger.info(f"[CONFIG READER] Start {date_}, term {term}")
+        current_date = (date_, term)
+
+        # Look if all files (all members and all domains) are already in final folder
+        if computer.files_are_in_final(grouper.filetag(*current_date)):
+            logger.info(
+                f"[CONFIG READER] File {date_}, term {term}, already in final")
+            continue
+        else:
+            if previous_date is not None:
+                if grouper.batch_is_complete(previous_date, current_date):
+                    logger.info(
+                        f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
+                    computer.concat_and_clean_computed_folder(
+                        grouper.filetag(*previous_date))
+                    computer.clean_cache_folder()
+
+            retry_and_finally_raise(
+                onRetry=onRetry,
+                onFailure=onFailure,
+                layout=layout
+            )(computer.compute)(*current_date)
+
+            previous_date = (date_, term)
+
+    last_time_tag = grouper.filetag(*previous_date)
+    logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
+    computer.concat_and_clean_computed_folder(last_time_tag)
+    computer.clean_cache_folder()
+
+    # Clean predictions
+    layout.clean_layout()
+    computer.make_surfex_compliant()
+    computer.clean_final_folder()
+
+    # Record end time
+    extraction_ends = datetime.now()
+
+    # Email
+    onSuccess(extraction_ends, extraction_ends - extraction_starts)
+
+    logger.info("[CONFIG READER] Extraction finished")
 
 
 def execute(config_user):
@@ -248,137 +337,93 @@ def execute(config_user):
 
     :param config_user: Dictionary containing the configuration as given by the user.
     """
-    logger.info("[CONFIG READER] Start extraction")
-
-    # Record time
-    extraction_starts = datetime.now()
-
     config_user = check_config_user(config_user)
-
     # A trick to use c.attribute instead of c["attribute"]
     c = DictNamespace(config_user)
 
-    # Create folder and subfolders
-    layout = FolderLayout(work_folder=c.work_folder)
+    iterator = TimeIterator(config_user).get_iterator()
 
-    # Initialize grouper
-    grouper = Grouper(c.groupby)
-
-    # Initialize computer
-    computer = ComputedValues(
-        layout,
+    _execute(
+        iterator,
+        onRetry=send_problem_extraction_email(config_user),
+        onFailure=send_script_stopped_email(config_user),
+        onSuccess=send_success_email(config_user),
+        work_folder=c.work_folder,
+        groupby=c.groupby,
         domain=c.domain,
-        computed_vars=c.variables,
-        autofetch_native=True,
+        variables=c.variables,
         model=c.model,
-        members=c.get("members", [None]),
-        dtype=c.get("dtype"))
-
-    # Time iterator
-    iterator = TimeIterator(config_user)
-
-    previous_date = (c.get("start_date"), c.get("start_term"))
-
-    for date_, term in iterator.get_iterator():
-        logger.info(f"[CONFIG READER] Start {date_}, term {term}")
-        current_date = (date_, term)
-        time_tag = grouper.filetag(*previous_date)
-
-        # Look if all files (all members and all domains) are already in final folder
-        if computer.files_are_in_final(time_tag):
-            logger.info(f"[CONFIG READER] File {date_}, term {term}, already in final")
-            continue
-        else:
-            if grouper.batch_is_complete(previous_date, current_date):
-                logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
-                computer.concat_and_clean_computed_folder(time_tag)
-                computer.clean_cache_folder()
-
-            retry_and_finally_raise(
-                onRetry=send_problem_extraction_email(config_user),
-                onFailure=send_script_stopped_email(config_user),
-                layout=layout
-            )(computer.compute)(*current_date)
-
-            previous_date = (date_, term)
-
-    last_time_tag = grouper.filetag(*previous_date)
-    logger.info(f"[CONFIG READER] File {date_}, term {term}, grouped in batch")
-    computer.concat_and_clean_computed_folder(last_time_tag)
-    computer.clean_cache_folder()
-
-    # Clean predictions
-    layout.clean_layout()
-    computer.make_surfex_compliant()
-    computer.clean_final_folder()
-
-    # Record end time
-    extraction_ends = datetime.now()
-
-    # Email
-    send_success_email(config_user)(extraction_ends, extraction_ends - extraction_starts)
-
-    logger.info("[CONFIG READER] Extraction finished")
+        members=c.get('members', [None]),
+        dtype=c.get('dtype', '32bits')
+    )
 
 
-def get_prestaging_file_list(config_user, layout):
+def _get_prestaging_file_list(
+        iterator,
+        model,
+        variables,
+        members):
+    """
+    Prepare a list with the content of a prestaging file.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    """
+    model_names = get_model_names(get_variable_instances(model, variables))
+    listfiles = []
+    notfound = []
+    for member in members:
+        for model_name in model_names:
+            reader = AromeHendrixReader(
+                model=model_name, getmode='locate', member=member)
+            model_list_files, model_not_found = reader.get_file_list(iterator)
+            listfiles += model_list_files
+            notfound += model_not_found
+    return listfiles, notfound
+
+
+def get_prestaging_file_list(config_user):
     """
     Prepare a list with the content of a prestaging file.
 
     :param config_user: Dictionary containing the configuration as given by the user.
     """
     c = DictNamespace(config_user)
+    iterator = TimeIterator(config_user).get_iterator()
 
-    computer = ComputedValues(
-        layout,
-        domain=c.domain,
-        computed_vars=c.variables,
-        autofetch_native=True,
-        model=c.model,
-        members=c.get("members", [None]))
-
-    model_names = get_model_names(computer.computed_vars)
-    listfiles = []
-    notfound = []
-    iterator = TimeIterator(config_user)
-    for member in computer.members:
-        for model_name in model_names:
-            reader = AromeHendrixReader(model=model_name, getmode='locate', member=member)
-            model_list_files, model_not_found = reader.get_file_list(iterator.get_iterator())
-            listfiles += model_list_files
-            notfound += model_not_found
-    return listfiles, notfound
+    return _get_prestaging_file_list(
+        iterator,
+        c.get('model', None),
+        c.variables,
+        c.get('members', [None])
+    )
 
 
-def prestage(config_user):
-    """
-    Write a .txt file the information necessary for prestagging.
-
-    :param config_user: Dictionary containing the configuration as given by the user.
-    """
-
-    config_user = check_config_user(config_user)
-    c = DictNamespace(config_user)
-    layout = FolderLayout(work_folder=c.work_folder, create_subfolders=False)
-    listfiles, _ = get_prestaging_file_list(config_user, layout)
-
+def _prestage(
+        listfiles,
+        model,
+        work_folder,
+        email_address,
+        start_date,
+        end_date
+):
+    layout = FolderLayout(work_folder=work_folder, create_subfolders=False)
     # Get name from email
-    name_str = config_user["email_address"].split("@")[0]
+    name_str = email_address.split("@")[0]
     name_str = name_str.replace('.', '_')
 
     # Str for name prestaging.txt
-    begin_str = config_user["start_date"].strftime("%m_%d_%Y")
-    end_str = config_user["end_date"].strftime("%m_%d_%Y")
+    begin_str = start_date.strftime("%m_%d_%Y")
+    end_str = end_date.strftime("%m_%d_%Y")
 
     # Unique ID
     id_ = str(uuid.uuid1())[:5]
 
     # Filepath
-    name_txt_file = f"prestaging_{name_str}_{c.model}_begin_{begin_str}_end_{end_str}_ID_{id_}.txt"
+    name_txt_file = f"prestaging_{name_str}_{model}_begin_{begin_str}_end_{end_str}_ID_{id_}.txt"
     filepath = os.path.join(layout.work_folder, name_txt_file)
 
     with open(filepath, 'w') as fp:
-        fp.write(f"#MAIL={c.email_address}\n")
+        fp.write(f"#MAIL={email_address}\n")
         for element in listfiles:
             fp.write(element + "\n")
 
@@ -392,7 +437,27 @@ def prestage(config_user):
         before the file is fully uploaded\n\n3. \
         Please wait for an email from the Hendrix team to download your data\n\n")
 
-    print("Prestaging info successfully written to {filepath}".format(filepath=filepath))
+    print("Prestaging info successfully written to {filepath}".format(
+        filepath=filepath))
+
+
+def prestage(config_user):
+    """
+    Write a .txt file the information necessary for prestagging.
+
+    :param config_user: Dictionary containing the configuration as given by the user.
+    """
+    config_user = check_config_user(config_user)
+    c = DictNamespace(config_user)
+    listfiles, _ = get_prestaging_file_list(config_user)
+    _prestage(
+        listfiles,
+        c.get('model', None),
+        c.work_folder,
+        c.email_address,
+        c.start_date,
+        c.end_date
+    )
 
 
 def print_link_to_hendrix_documentation():
@@ -434,9 +499,12 @@ def help_variables(model):
     dict_vars = model_vars.vars
     print(dict_vars)
     for key in dict_vars:
-        dict_vars[key]['native_model'] = [native_var.model_name for native_var in dict_vars[key]['native_vars']]
-        dict_vars[key]['alternative_names'] = [native_var.alternative_names for native_var in dict_vars[key]['native_vars']]
-        dict_vars[key]['native_vars'] = [native_var.name for native_var in dict_vars[key]['native_vars']]
+        dict_vars[key]['native_model'] = [
+            native_var.model_name for native_var in dict_vars[key]['native_vars']]
+        dict_vars[key]['alternative_names'] = [
+            native_var.alternative_names for native_var in dict_vars[key]['native_vars']]
+        dict_vars[key]['native_vars'] = [
+            native_var.name for native_var in dict_vars[key]['native_vars']]
     pprint(dict_vars)
 
 

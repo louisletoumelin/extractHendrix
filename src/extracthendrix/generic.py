@@ -64,7 +64,8 @@ class FolderLayout:
         # Subfolders
         if create_subfolders:
             for subfolder in ['_native_', '_cache_', '_computed_', '_final_']:
-                setattr(self, subfolder, os.path.join(self.work_folder, subfolder))
+                setattr(self, subfolder, os.path.join(
+                    self.work_folder, subfolder))
                 self.create_folder_if_doesnt_exist(getattr(self, subfolder))
 
     def clean_layout(self):
@@ -77,6 +78,7 @@ class AromeCacheManager:
     """
     A class that deals with data in cache and eventually triggers downloading.
     """
+
     def __init__(
             self,
             folderLayout,
@@ -141,8 +143,10 @@ class AromeCacheManager:
         """
         domain_description = domains_descriptions[domain]
         if self.extractor.model_name not in ['AROME', 'AROME_SURFACE']:
-            i1, j1 = np.round(field.geometry.ll2ij(domain_description['lon_llc'], domain_description['lat_llc'])) + 1
-            i2, j2 = np.round(field.geometry.ll2ij(domain_description['lon_urc'], domain_description['lat_urc'])) + 1
+            i1, j1 = np.round(field.geometry.ll2ij(
+                domain_description['lon_llc'], domain_description['lat_llc'])) + 1
+            i2, j2 = np.round(field.geometry.ll2ij(
+                domain_description['lon_urc'], domain_description['lat_urc'])) + 1
             field = field.extract_subarray(int(i1), int(i2), int(j1), int(j2))
         else:
             field = field.extract_subarray(
@@ -173,17 +177,22 @@ class AromeCacheManager:
                         variable = alternatives_names.pop(0)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
-                        logger.info(f"[CACHE MANAGER] Aternative name for {initial_name.name} works: {variable}")
+                        logger.info(
+                            f"[CACHE MANAGER] Aternative name for {initial_name.name} works: {variable}")
                         return field
                     except AssertionError:
                         logger.info(f"[CACHE MANAGER] Alternative name {variable} "
                                     f"didn't work for variable {initial_name.name}")
                         pass
-                logger.error(f"[CACHE MANAGER] No correct alternative names for {initial_name}")
-                raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
+                logger.error(
+                    f"[CACHE MANAGER] No correct alternative names for {initial_name}")
+                raise CanNotReadEpygramField(
+                    f"We couldn't find correct alternative names for {initial_name}")
             else:
-                logger.error(f"[CACHE MANAGER] We couldn't read {initial_name}")
-                raise CanNotReadEpygramField(f"We couldn't read {initial_name}")
+                logger.error(
+                    f"[CACHE MANAGER] We couldn't read {initial_name}")
+                raise CanNotReadEpygramField(
+                    f"We couldn't read {initial_name}")
 
     @staticmethod
     def pass_metadata_to_netcdf(field, outname=None):
@@ -212,8 +221,10 @@ class AromeCacheManager:
         :param term: forecast lead time
         :return: path of the native file, Epygram resource
         """
-        native_file_path = self.extractor.get_native_file(date, term, autofetch=self.autofetch_native)
-        input_resource = epygram.formats.resource(native_file_path, 'r', fmt=self.extractor.fmt.upper())
+        native_file_path = self.extractor.get_native_file(
+            date, term, autofetch=self.autofetch_native)
+        input_resource = epygram.formats.resource(
+            native_file_path, 'r', fmt=self.extractor.fmt.upper())
         return native_file_path, input_resource
 
     def put_in_cache(self, date, term, domain):
@@ -236,11 +247,14 @@ class AromeCacheManager:
             return
 
         # Initialize netcdf file
-        output_resource = epygram.formats.resource(filepath_in_cache, 'w', fmt='netCDF')
-        output_resource.behave(N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
+        output_resource = epygram.formats.resource(
+            filepath_in_cache, 'w', fmt='netCDF')
+        output_resource.behave(
+            N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
 
         # Download file on Hendrix if necessary
-        native_file_path, input_resource = self.get_native_resource_if_necessary(date, term)
+        native_file_path, input_resource = self.get_native_resource_if_necessary(
+            date, term)
 
         # Extract variable from native file (i.e. .fa or .grib)
         for variable in self.native_variables:
@@ -372,6 +386,24 @@ def validity_date(date_, term):
         return date_ + timedelta(hours=term)
 
 
+def get_variable_instances(model, computed_variables):
+    """
+    Link a model name to the object containing information about the model variables.
+
+    :param model: Model name.
+    :param variables: Computed variables names (e.g. "Tair" and not "CLSTEMPERATURE").
+    :return: List of model variables.
+    """
+    logger.info(f"Asked for model: {model}. Models available:"
+                f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
+    # Look at all variables, and class instances imported and select the one corresponding to the model
+    model_vars = globals()[model.lower()]
+    # If we need surface variables, the model becomes a list of native models (e.g. AROME = AROME + SURFEX)
+    model_and_submodels = [getattr(model_vars, variable)
+                           for variable in computed_variables]
+    return model_and_submodels
+
+
 class ComputedValues:
     """
     Compute variables in cache and store computed values in netcdf format.
@@ -400,38 +432,20 @@ class ComputedValues:
         :param members: Member number?
         :param model: Model name.
         """
-        self.computed_vars = self.str2attrs(model, computed_vars)
+        self.computed_vars = get_variable_instances(model, computed_vars)
         self.members = members
         self.domain = domain
         self.delete_native = delete_native
         self.delete_computed_netcdf = delete_computed_netcdf
         self.models = get_model_names(self.computed_vars)
-        self.native_vars_by_model = sort_native_vars_by_model(self.computed_vars)
+        self.native_vars_by_model = sort_native_vars_by_model(
+            self.computed_vars)
         self.computed_files = defaultdict(lambda: [])
         self.folderLayout = folderLayout
-        self.cache_managers = self._cache_managers(folderLayout, self.computed_vars, autofetch_native)
+        self.cache_managers = self._cache_managers(
+            folderLayout, self.computed_vars, autofetch_native)
         self.model = model
         self.dtype = dtype
-
-    @staticmethod
-    def str2attrs(model, computed_variables):
-        """
-        Link a model name to the object containing information about the model variables.
-
-        :param model: Model name.
-        :param variables: Computed variables names (e.g. "Tair" and not "CLSTEMPERATURE").
-        :return: List of model variables.
-        """
-        logger.info(f"Asked for model: {model}. Models available:"
-                    f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
-
-        # isinstance(globals(), dict) == True
-        # Look at all variables, and class instances imported and select the one corresponding to the model
-        model_vars = globals()[model.lower()]
-
-        # If we need surface variables, the model becomes a list of native models (e.g. AROME = AROME + SURFEX)
-        model_and_submodels = [getattr(model_vars, variable) for variable in computed_variables]
-        return model_and_submodels
 
     def _cache_managers(self, folderLayout, computed_vars, autofetch_native):
         """
@@ -447,7 +461,8 @@ class ComputedValues:
                 folderLayout=folderLayout,
                 domain=self.domain,
                 native_variables=native_vars,
-                alternative_names={var: var.alternative_names for var in native_vars},
+                alternative_names={
+                    var: var.alternative_names for var in native_vars},
                 model=model_name,
                 delete_native=self.delete_native,
                 autofetch_native=autofetch_native,
@@ -476,14 +491,16 @@ class ComputedValues:
         :param domain: Geographical domain name.
         """
         if self.computed_files[(member, domain)]:
-            ds = xr.open_mfdataset(self.computed_files[(member, domain)], concat_dim='time')
+            ds = xr.open_mfdataset(
+                self.computed_files[(member, domain)], concat_dim='time')
             if self.dtype == "32bits":
                 ds = ds.astype(np.float32)
             filepath = self.get_path_file_in_final(time_tag, member, domain)
             ds.to_netcdf(filepath)
             logger.debug(f"[COMPUTER] Saved file: {filepath}")
         else:
-            logger.info(f"[COMPUTER] self.computed_files[(member, domain)] is empty")
+            logger.info(
+                f"[COMPUTER] self.computed_files[(member, domain)] is empty")
 
     def _delete_and_forget_computed_files(self, member, domain):
         """
@@ -493,7 +510,8 @@ class ComputedValues:
         :param domain: Geographical domain name.
         """
         if self.delete_computed_netcdf:
-            self._delete_files_in_list_of_files(self.computed_files[(member, domain)])
+            self._delete_files_in_list_of_files(
+                self.computed_files[(member, domain)])
         if self.computed_files[(member, domain)]:
             del self.computed_files[(member, domain)]
 
@@ -587,7 +605,8 @@ class ComputedValues:
         """
         computed_dataset = xr.Dataset({variable_name: variable_data
                                        for variable_name, variable_data in variables_storage.items()})
-        computed_dataset = computed_dataset.expand_dims(dim='time').set_coords('time')
+        computed_dataset = computed_dataset.expand_dims(
+            dim='time').set_coords('time')
         if self.dtype == "32bits":
             computed_dataset = computed_dataset.astype(np.float32)
         computed_dataset.to_netcdf(filepath_computed)
@@ -603,7 +622,8 @@ class ComputedValues:
 
             for file in os.listdir(self.folderLayout._final_):
                 if (domain in file) and (file != domain):
-                    current_path = os.path.join(self.folderLayout._final_, file)
+                    current_path = os.path.join(
+                        self.folderLayout._final_, file)
                     new_path = os.path.join(path_domain, file)
                     os.rename(current_path, new_path)
 
@@ -638,7 +658,8 @@ class ComputedValues:
         files_in_final = []
         for member in self.members:
             for domain in self.domain:
-                path_file_in_final = self.get_path_file_in_final(time_tag, member, domain)
+                path_file_in_final = self.get_path_file_in_final(
+                    time_tag, member, domain)
                 files_in_final.append(os.path.isfile(path_file_in_final))
 
         return any(files_in_final)
@@ -659,7 +680,8 @@ class ComputedValues:
         read_cache_func = self.cache_managers[(model_name, member)].read_cache
         list_native_vars = computed_var.native_vars
 
-        computed_values = computed_var.compute(read_cache_func, date, term, domain, *list_native_vars)
+        computed_values = computed_var.compute(
+            read_cache_func, date, term, domain, *list_native_vars)
         return computed_values
 
     def delete_native_files(self):
@@ -684,9 +706,11 @@ class ComputedValues:
             xx = len(ds.xx)
             yy = len(ds.yy)
             time = len(ds.time)
-            ds["CO2air"] = (("time", "xx", "yy"), np.full((time, xx, yy), 0.00062))
+            ds["CO2air"] = (("time", "xx", "yy"),
+                            np.full((time, xx, yy), 0.00062))
             if "Wind_DIR" not in ds:
-                ds["Wind_DIR"] = (("time", "xx", "yy"), np.zeros((time, xx, yy)))
+                ds["Wind_DIR"] = (("time", "xx", "yy"),
+                                  np.zeros((time, xx, yy)))
             ds["UREF"] = (("xx", "yy"), np.full((xx, yy), 10))
             ds["ZREF"] = (("xx", "yy"), np.full((xx, yy), 2))
             ds["slope"] = (("xx", "yy"), np.zeros((xx, yy)))
@@ -696,7 +720,8 @@ class ComputedValues:
             # Save file to netcdf
             if self.dtype == "32bits":
                 ds = ds.astype(np.float32)
-            ds.to_netcdf(filename.split(".nc")[0]+"_tmp.nc", unlimited_dims={"time": True})
+            ds.to_netcdf(filename.split(".nc")[
+                         0]+"_tmp.nc", unlimited_dims={"time": True})
             os.remove(filename)
             os.rename(filename.split(".nc")[0]+"_tmp.nc", filename)
 
@@ -711,14 +736,17 @@ class ComputedValues:
             for domain in self.domain:
 
                 # Look at files already computed
-                path_file_in_computed = self.get_path_file_in_computed(run, term, member, domain)
-                file_is_already_computed = os.path.isfile(path_file_in_computed)
+                path_file_in_computed = self.get_path_file_in_computed(
+                    run, term, member, domain)
+                file_is_already_computed = os.path.isfile(
+                    path_file_in_computed)
 
                 member_str = f", member {member}" if member else ""
                 computer_str = f"[COMPUTER] {run}, term {term}, domain {domain}{member_str}"
                 if file_is_already_computed:
                     logger.debug(f"{computer_str} already computed")
-                    self.computed_files[(member, domain)].append(path_file_in_computed)
+                    self.computed_files[(member, domain)].append(
+                        path_file_in_computed)
                 else:
                     logger.debug(f"{computer_str} NOT computed")
                     # Store computed values before saving to netcdf
@@ -726,7 +754,8 @@ class ComputedValues:
 
                     # Iterate on variables asked by the user (i.e. computed var)
                     for computed_var in self.computed_vars:
-                        computed_values = self.compute_variables_in_cache(computed_var, member, run, term, domain)
+                        computed_values = self.compute_variables_in_cache(
+                            computed_var, member, run, term, domain)
                         variables_storage[computed_var.name] = computed_values
                         logger.debug(f"[COMPUTER] "
                                      f"{computed_var.name}, "
@@ -736,10 +765,13 @@ class ComputedValues:
                     variables_storage['time'] = validity_date(run, term)
 
                     # Create netcdf file of computed values
-                    self.save_computed_vars_to_netcdf(path_file_in_computed, variables_storage)
+                    self.save_computed_vars_to_netcdf(
+                        path_file_in_computed, variables_storage)
 
                     # Remember that current file is computed
-                    self.computed_files[(member, domain)].append(path_file_in_computed)
-                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}{member_str} computed and saved")
+                    self.computed_files[(member, domain)].append(
+                        path_file_in_computed)
+                    logger.debug(
+                        f"[COMPUTER] {run}, term {term}, domain {domain}{member_str} computed and saved")
 
             self.delete_native_files()
