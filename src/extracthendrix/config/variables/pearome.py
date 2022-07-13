@@ -1,7 +1,7 @@
 import sys
 from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c, compute_wind_speed, \
     compute_t_r_p2qv, compute_wind_direction, sum_solid_prec, percent2fraction, joule2watt_hourly
-from extracthendrix.config.variables import pearome_grib as pea
+from .native import pearome_native as pea
 # from . import arome_surface_native as asn
 from .utils import Variable
 

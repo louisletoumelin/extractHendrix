@@ -4,16 +4,12 @@ from extracthendrix.config.post_proc_functions_new import \
     compute_wind_speed, \
     compute_wind_direction,\
     copy, \
-    compute_decumul,\
-    compute_decumul_and_diff, \
     compute_psurf, \
     compute_zs, \
-    compute_snowfall, \
     compute_sum_all_water_species, \
-    compute_latent_heat_flux, \
-    compute_decumul_and_negative, \
-    compute_multiply_by_100
-from .native import arome_analysis_native as ann
+    compute_multiply_by_100, \
+    compute_sum
+from .native import arome_analysis_p0_native as ann
 from .utils import Variable
 
 """
@@ -117,91 +113,22 @@ vars = {
     # Precipitations
     #
 
+    #
+    # Warning: no decumul for P0
+    #
+
     'Rainf':
-        dict(native_vars=[ann.SURFACCPLUIE],
-             compute=compute_decumul),
+        dict(native_vars=[ann.SURFINSPLUIE],
+             compute=copy),
 
     'Grauf':
-        dict(native_vars=[ann.SURFACCGRAUPEL],
-             compute=compute_decumul),
+        dict(native_vars=[ann.SURFINSGRAUPEL],
+             compute=copy),
 
     'Snowf':
-        dict(native_vars=[ann.SURFACCNEIGE, ann.SURFACCGRAUPEL],
-             compute=compute_snowfall,
+        dict(native_vars=[ann.SURFINSNEIGE, ann.SURFINSGRAUPEL],
+             compute=compute_sum,
              original_long_name="Snowfall = Cumulative snow + graupel"),
-
-    #
-    # Longwave
-    #
-
-    'LWdown':
-        dict(native_vars=[ann.SURFRAYT__THER__DE],
-             compute=compute_decumul),
-    'LWU':
-        dict(native_vars=[ann.SURFRAYT__THER__DE, ann.SURFFLU__RAY__THER],
-             compute=compute_decumul_and_diff),
-
-    'TOA_LWnet':
-        dict(native_vars=[ann.SOMMFLU__RAY__THER],
-             compute=compute_decumul,
-             original_long_name="Cum. net IR flux top of atm."),
-    'LWnet':
-        dict(native_vars=[ann.SURFFLU__RAY__THER],
-             compute=compute_decumul,
-             original_long_name="Cum. net IR flux at surface"),
-
-    'clear_sky_LWnet':
-        dict(native_vars=[ann.SRAYT__THER__CL],
-             compute=copy,
-             original_long_name="Net Clear sky surf thermal radiation"),
-
-    #
-    # Shortwave
-    #
-
-    'DIR_SWdown':
-        dict(native_vars=[ann.SURFRAYT__DIR__SUR],
-             compute=compute_decumul),
-    'SCA_SWdown':
-        dict(native_vars=[ann.SURFRAYT__SOLA__DE, ann.SURFRAYT__DIR__SUR],
-             compute=compute_decumul_and_diff,
-             original_long_name="SURFRAYT SOLA DE = Cum. Downward solar flux at surface"),
-
-    'TOA_SWnet':
-        dict(native_vars=[ann.SOMMFLU__RAY__SOLA],
-             compute=compute_decumul,
-             original_long_name="Cum. net solar flux top of atm."),
-    'SWnet':
-        dict(native_vars=[ann.SURFFLU__RAY__SOLA],
-             compute=compute_decumul,
-             original_long_name="Cum. net solar flux at surface"),
-    'SWD':
-        dict(native_vars=[ann.SURFRAYT__SOLA__DE],
-             compute=compute_decumul,
-             original_long_name="Cum. Downward solarflux at surface"),
-
-    'SWU':
-        dict(native_vars=[ann.SURFRAYT__SOLA__DE, ann.SURFFLU__RAY__SOLA],
-             compute=compute_decumul_and_diff,
-             original_long_name="Cum. Downward solarflux at surface"),
-
-    'clear_sky_SWnet':
-        dict(native_vars=[ann.SRAYT__SOL__CL],
-             compute=copy,
-             original_long_name="Net Clear sky surf solar radiation"),
-
-    #
-    # Turbulent fluxes
-    #
-
-    'LHF':
-        dict(native_vars=[ann.SURFFLU__LAT__MEVA, ann.SURFFLU__LAT__MSUB],
-             compute=compute_latent_heat_flux,
-             original_long_name="LHF =SURFFLU.LAT.MEVA' + 'SURFFLU.LAT.MSUB'"),
-    'SHF':
-        dict(native_vars=[ann.SURFFLU__CHA__SENS],
-             compute=compute_decumul_and_negative,
-             original_long_name="Cum.Sensible heat flux"),
 
     #
     # Clouds
@@ -223,23 +150,6 @@ vars = {
         dict(native_vars=[ann.SURFNEBUL__HAUTE],
              compute=copy,
              original_long_name="Inst. High nebulosity"),
-
-    'CC_cumul':
-        dict(native_vars=[ann.ATMONEBUL__TOTALE],
-             compute=compute_decumul,
-             original_long_name="Cum. total nebulosity"),
-    'CC_cumul_low':
-        dict(native_vars=[ann.ATMONEBUL__BASSE],
-             compute=compute_decumul,
-             original_long_name="Cum. total nebulosity. Used by Seity."),
-    'CC_cumul_middle':
-        dict(native_vars=[ann.ATMONEBUL__MOYENN],
-             compute=compute_decumul,
-             original_long_name="Cum. total nebulosity. Used by Seity."),
-    'CC_cumul_high':
-        dict(native_vars=[ann.ATMONEBUL__HAUTE],
-             compute=compute_decumul,
-             original_long_name="Cum. total nebulosity. Used by Seity."),
     #
     # Variables by level
     #

@@ -8,7 +8,8 @@ config_user = dict(
     # Your folder. If it doesn't exists, it will be created.
     work_folder="path/to/my/folder/",
 
-    # Model: "AROME", "AROME_analysis", "PEAROME", "ARPEGE", "ARPEGE_analysis_4dvar", "PEARP"...
+    # Model: "AROME", "AROME_analysis", "AROME_analysis_P0", "AROME_analysis_P1", "PEAROME", "ARPEGE",
+    # "ARPEGE_analysis_4dvar", "PEARP"...
     # Use help_model() command to get help with this key.
     model="AROME",
 

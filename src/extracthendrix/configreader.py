@@ -10,7 +10,7 @@ from pprint import pprint
 from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, get_model_names
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.hendrix_emails import send_problem_extraction_email, send_script_stopped_email, send_success_email
-from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar, pearp
+from extracthendrix.config.variables import arome, pearome, arome_analysis, arome_analysis_p0, arome_analysis_p1, arpege, arpege_analysis_4dvar, pearp
 from extracthendrix.config.domains import domains_descriptions
 
 logging.getLogger("footprints").setLevel("CRITICAL")
@@ -173,7 +173,7 @@ class TimeIterator:
         while current_date <= self.end_date:
             current_term = self.start_term
             while current_term <= self.end_term:
-                yield (datetime.combine(current_date, time(hour=self.run)), current_term)
+                yield datetime.combine(current_date, time(hour=self.run)), current_term
                 current_term += self.delta_t
             current_date += timedelta(days=1)
 
@@ -181,7 +181,7 @@ class TimeIterator:
         """Iterator for analysis"""
         current_datetime = self.start_date
         while current_datetime <= self.end_date:
-            yield (current_datetime, self.term)
+            yield current_datetime, self.term
             current_datetime += timedelta(hours=self.delta_t)
 
     def dateiterator4dvar(self, synoptic_hour=6):
@@ -191,7 +191,7 @@ class TimeIterator:
             hour_analysis = 6 * (current_datetime.hour // synoptic_hour)
             analysis_date = current_datetime.replace(hour=hour_analysis)
             term = current_datetime.hour % 6
-            yield (analysis_date, term)
+            yield analysis_date, term
             current_datetime += timedelta(hours=self.delta_t)
 
     def get_iterator(self):
@@ -430,7 +430,13 @@ def help_model():
 
 def help_variables(model):
     """Helping function for variables keyword in config_user"""
-    model_vars = globals()[model.lower()]
+    try:
+        model_vars = globals()[model.lower()]
+    except KeyError:
+        raise NotImplementedError(f"Model {model.lower()} not available. "
+                                  f"Models available:"
+                                  f"'AROME', 'AROME_analysis', 'AROME_analysis_P0', 'AROME_analysis_P1', 'PEAROME'"
+                                  f"'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
     dict_vars = model_vars.vars
     print(dict_vars)
     for key in dict_vars:

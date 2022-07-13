@@ -13,7 +13,7 @@ from extracthendrix.config.post_proc_functions_new import \
     compute_latent_heat_flux, \
     compute_decumul_and_negative, \
     compute_multiply_by_100
-from .native import arome_analysis_native as ann
+from .native import arome_analysis_p1_native as ann
 from .utils import Variable
 
 """
@@ -150,11 +150,6 @@ vars = {
              compute=compute_decumul,
              original_long_name="Cum. net IR flux at surface"),
 
-    'clear_sky_LWnet':
-        dict(native_vars=[ann.SRAYT__THER__CL],
-             compute=copy,
-             original_long_name="Net Clear sky surf thermal radiation"),
-
     #
     # Shortwave
     #
@@ -184,11 +179,6 @@ vars = {
         dict(native_vars=[ann.SURFRAYT__SOLA__DE, ann.SURFFLU__RAY__SOLA],
              compute=compute_decumul_and_diff,
              original_long_name="Cum. Downward solarflux at surface"),
-
-    'clear_sky_SWnet':
-        dict(native_vars=[ann.SRAYT__SOL__CL],
-             compute=copy,
-             original_long_name="Net Clear sky surf solar radiation"),
 
     #
     # Turbulent fluxes

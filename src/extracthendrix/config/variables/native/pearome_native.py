@@ -1,5 +1,5 @@
 import sys
-from .utils import NativeVariable
+from extracthendrix.config.variables.utils import NativeVariable
 
 """
 In this file you will find native variables names in PEAROME. 

@@ -1,12 +1,10 @@
 import pytest
-import numpy as np
-import xarray as xr
 
 from extracthendrix.readers import AromeHendrixReader, NativeFileUnfetchedException
 from extracthendrix.generic import AromeCacheManager
 from extracthendrix.generic import FolderLayout
 from extracthendrix.configreader import execute, prestage
-import extracthendrix.config.variables.arome_native as an
+import extracthendrix.config.variables.native.arome_native as an
 
 import os
 import shutil

@@ -1,8 +1,8 @@
 import sys
-from .utils import NativeVariable
+from extracthendrix.config.variables.utils import NativeVariable
 
 """
-In this file you will find native variables names in ARPEGE_analysis_4dvar. 
+In this file you will find native variables names in ARPEGE. 
 If you need to implement a new variable, please give the native variable here.
 
 Sometime, the name of a variable can change with time (ex: wind gust).
@@ -13,7 +13,7 @@ See Documentation in arome.py for more details.
 29/06/2022: the variables have to be implemented.
 """
 
-model = "ARPEGE_analysis_4dvar"
+model = "ARPEGE"
 
 vars = {'zs': dict(name='Geometrical height', shortName='h', parameterCategory=3, parameterNumber=6,
                    typeOfFirstFixedSurface=1, level=0, productDefinitionTemplateNumber=1),

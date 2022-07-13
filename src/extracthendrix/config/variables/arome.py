@@ -12,10 +12,8 @@ from extracthendrix.config.post_proc_functions_new import \
     compute_sum_all_water_species, \
     compute_latent_heat_flux, \
     compute_decumul_and_negative, \
-    compute_multiply_by_100, \
-    compute_t_r_p2qv
-from . import arome_native as an
-from . import arome_surface_native as asn
+    compute_multiply_by_100
+from .native import arome_surface_native as asn, arome_native as an
 from .utils import Variable
 
 """

@@ -1,6 +1,6 @@
 import sys
-from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c, compute_wind_speed, copy, compute_decumul
-from . import pearp_native as pearp_nat
+from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c
+from .native import pearp_native as pearp_nat
 from .utils import Variable
 
 """

@@ -6,7 +6,7 @@ import os
 import shutil
 from datetime import date, time, datetime
 from extracthendrix.config.variables import pearome
-import extracthendrix.config.variables.pearome_grib as peg
+import extracthendrix.config.variables.native.pearome_native as peg
 
 
 test_folder = f"/cnrm/cen/users/NO_SAVE/{os.environ['HOME'].split('/')[-1]}/extracthendrix/testing/"

@@ -15,7 +15,7 @@ from extracthendrix.hendrix_emails import send_problem_extraction_email, send_sc
 from extracthendrix.readers import AromeHendrixReader
 from extracthendrix.config.domains import domains_descriptions
 from extracthendrix.exceptions import CanNotReadEpygramField
-from extracthendrix.config.variables import arome, pearome, arome_analysis, arpege, arpege_analysis_4dvar, pearp
+from extracthendrix.config.variables import arome, pearome, arome_analysis, arome_analysis_p0, arome_analysis_p1, arpege, arpege_analysis_4dvar, pearp
 
 logging.getLogger("footprints").setLevel("CRITICAL")
 logging.getLogger('vortex').setLevel("CRITICAL")
@@ -423,11 +423,18 @@ class ComputedValues:
         :return: List of model variables.
         """
         logger.info(f"Asked for model: {model}. Models available:"
-                    f"'AROME', 'AROME_analysis', 'PEAROME', 'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
+                    f"'AROME', 'AROME_analysis', 'AROME_analysis_P0', 'AROME_analysis_P1', 'PEAROME'"
+                    f"'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
 
         # isinstance(globals(), dict) == True
         # Look at all variables, and class instances imported and select the one corresponding to the model
-        model_vars = globals()[model.lower()]
+        try:
+            model_vars = globals()[model.lower()]
+        except KeyError:
+            raise NotImplementedError(f"Model {model.lower()} not available. "
+                                      f"Models available:"
+                                      f"'AROME', 'AROME_analysis', 'AROME_analysis_P0', 'AROME_analysis_P1', 'PEAROME'"
+                                      f"'ARPEGE', 'ARPEGE_analysis_4dvar', 'PEARP'")
 
         # If we need surface variables, the model becomes a list of native models (e.g. AROME = AROME + SURFEX)
         model_and_submodels = [getattr(model_vars, variable) for variable in computed_variables]

@@ -1,5 +1,5 @@
 import sys
-from .utils import NativeVariable
+from extracthendrix.config.variables.utils import NativeVariable
 
 """
 In this file you will find native variables names in AROME. 
@@ -26,7 +26,8 @@ vars = ['CLSTEMPERATURE', 'S090TEMPERATURE', 'SURFTEMPERATURE', 'CLSMINI.TEMPERA
         'S090CLOUD_WATER', 'S090ICE_CRYSTAL', 'S090SNOW', 'S090RAIN',
         'S087CLOUD_WATER', 'S087ICE_CRYSTAL', 'S087SNOW', 'S087RAIN',
         'S084CLOUD_WATER', 'S084ICE_CRYSTAL', 'S084SNOW', 'S084RAIN',
-        'S075CLOUD_WATER', 'S075ICE_CRYSTAL', 'S075SNOW', 'S075RAIN']
+        'S075CLOUD_WATER', 'S075ICE_CRYSTAL', 'S075SNOW', 'S075RAIN',
+        'SURFINSPLUIE', 'SURFINSNEIGE', 'SURFINSGRAUPEL']
 
 module = sys.modules[__name__]
 for name in vars:

@@ -1,6 +1,6 @@
 import sys
-from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c, compute_wind_speed, copy, compute_decumul
-from . import arpege_native_analysis_4dvar as arpn4dvar
+from extracthendrix.config.post_proc_functions_new import compute_temperature_in_degree_c
+from .native import arpege_analysis_4dvar_native as arpn4dvar
 from .utils import Variable
 
 """

@@ -185,5 +185,11 @@ def compute_sum_all_water_species(read_cache, date, term, domain, name_droplet, 
     return droplet + ice + snow + rain
 
 
+def compute_sum(read_cache, date, term, domain, var1_name, var2_name):
+    var1 = copy(read_cache, date, term, domain, var1_name)
+    var2 = copy(read_cache, date, term, domain, var2_name)
+    return var1 + var2
+
+
 def compute_multiply_by_100(read_cache, date, term, domain, native_variable):
     return 100*read_cache(date, term, domain, native_variable)

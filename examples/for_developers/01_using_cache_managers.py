@@ -1,9 +1,8 @@
-from datetime import timedelta, time, datetime, date
-from pprint import pprint
-from extracthendrix.generic import ComputedValues, FolderLayout, validity_date, AromeCacheManager
+from datetime import time, date
+from extracthendrix.generic import FolderLayout, AromeCacheManager
 # TODO: generic c'est vraiment pas terrible comme nom faudrait trouver une idée plus parlante
 # dir(an) pour voir les noms de variables disponibles - les points sont remplacés par des doubles __ (car interdits dans les noms de variables)
-import extracthendrix.config.variables.arome_native as an
+import extracthendrix.config.variables.native.arome_native as an
 from extracthendrix.readers import AromeHendrixReader
 
 layout = FolderLayout(
