@@ -4,6 +4,7 @@ import itertools
 import os
 import configparser
 import pkg_resources
+from copy import deepcopy
 
 import ftplib
 from ftplib import FTP
@@ -370,11 +371,15 @@ class AromeHendrixReader(HendrixFileReader):
         :param term: Forecast lead time
         :return: List of resource descriptions.
         """
-        resource_descriptions = [dict(
-            **model_description,
-            date=date,
-            term=term
-        ) for model_description in self.list_resource_descriptions]
+        resource_descriptions = []
+        list_resource_descriptions = deepcopy(self.list_resource_descriptions)
+        for model_description in list_resource_descriptions:
+
+            # This is necessary since some models (e.g. AROME_analysis_p0) have always the same term
+            if "term" in model_description:
+                standard_term = model_description.pop("term")
+                term = int(standard_term)
+            resource_descriptions.append(dict(**model_description, date=date, term=term))
 
         if self.getmode == 'get':
             for resource in resource_descriptions:
