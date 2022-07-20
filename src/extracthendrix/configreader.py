@@ -203,16 +203,10 @@ class TimeIterator:
         model_is_analysis = "analysis" in self.model
         model_is_4dvar = "4dvar" in self.model
         if model_is_analysis and not model_is_4dvar:
-            print("debug iterator")
-            print("return dateiteratoranalysis")
             return self.dateiteratoranalysis()
         elif model_is_4dvar:
-            print("debug iterator")
-            print("return dateiterator4dvar")
             return self.dateiterator4dvar()
         else:
-            print("debug iterator")
-            print("return dateiteratorforecast")
             return self.dateiteratorforecast()
 
 

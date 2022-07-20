@@ -177,22 +177,18 @@ class AromeCacheManager:
                         variable = alternatives_names.pop(0)
                         field = input_resource.readfield(variable)
                         field.fid["FA"] = initial_name
-                        logger.info(
-                            f"[CACHE MANAGER] Aternative name for {initial_name.name} works: {variable}")
+                        logger.info(f"[CACHE MANAGER] Aternative name for {initial_name.name} works: {variable}")
                         return field
                     except AssertionError:
                         logger.info(f"[CACHE MANAGER] Alternative name {variable} "
                                     f"didn't work for variable {initial_name.name}")
                         pass
-                logger.error(
-                    f"[CACHE MANAGER] No correct alternative names for {initial_name}")
-                raise CanNotReadEpygramField(
-                    f"We couldn't find correct alternative names for {initial_name}")
+                logger.error(f"[CACHE MANAGER] No correct alternative names for {initial_name}")
+                raise CanNotReadEpygramField(f"We couldn't find correct alternative names for {initial_name}")
             else:
                 logger.error(
                     f"[CACHE MANAGER] We couldn't read {initial_name}")
-                raise CanNotReadEpygramField(
-                    f"We couldn't read {initial_name}")
+                raise CanNotReadEpygramField(f"We couldn't read {initial_name}")
 
     @staticmethod
     def pass_metadata_to_netcdf(field, outname=None):
@@ -221,10 +217,8 @@ class AromeCacheManager:
         :param term: forecast lead time
         :return: path of the native file, Epygram resource
         """
-        native_file_path = self.extractor.get_native_file(
-            date, term, autofetch=self.autofetch_native)
-        input_resource = epygram.formats.resource(
-            native_file_path, 'r', fmt=self.extractor.fmt.upper())
+        native_file_path = self.extractor.get_native_file(date, term, autofetch=self.autofetch_native)
+        input_resource = epygram.formats.resource(native_file_path, 'r', fmt=self.extractor.fmt.upper())
         return native_file_path, input_resource
 
     def put_in_cache(self, date, term, domain):
@@ -246,15 +240,15 @@ class AromeCacheManager:
         if os.path.isfile(filepath_in_cache) and self.autofetch_native:
             return
 
+        # Download file on Hendrix if necessary
+        native_file_path, input_resource = self.get_native_resource_if_necessary(date, term)
+        logger.debug(self.native_variables)
+
         # Initialize netcdf file
         output_resource = epygram.formats.resource(
             filepath_in_cache, 'w', fmt='netCDF')
         output_resource.behave(
             N_dimension='Number_of_points', X_dimension='xx', Y_dimension='yy')
-
-        # Download file on Hendrix if necessary
-        native_file_path, input_resource = self.get_native_resource_if_necessary(
-            date, term)
 
         # Extract variable from native file (i.e. .fa or .grib)
         for variable in self.native_variables:
@@ -680,8 +674,7 @@ class ComputedValues:
         read_cache_func = self.cache_managers[(model_name, member)].read_cache
         list_native_vars = computed_var.native_vars
 
-        computed_values = computed_var.compute(
-            read_cache_func, date, term, domain, *list_native_vars)
+        computed_values = computed_var.compute(read_cache_func, date, term, domain, *list_native_vars)
         return computed_values
 
     def delete_native_files(self):
@@ -754,8 +747,7 @@ class ComputedValues:
 
                     # Iterate on variables asked by the user (i.e. computed var)
                     for computed_var in self.computed_vars:
-                        computed_values = self.compute_variables_in_cache(
-                            computed_var, member, run, term, domain)
+                        computed_values = self.compute_variables_in_cache(computed_var, member, run, term, domain)
                         variables_storage[computed_var.name] = computed_values
                         logger.debug(f"[COMPUTER] "
                                      f"{computed_var.name}, "
@@ -765,13 +757,10 @@ class ComputedValues:
                     variables_storage['time'] = validity_date(run, term)
 
                     # Create netcdf file of computed values
-                    self.save_computed_vars_to_netcdf(
-                        path_file_in_computed, variables_storage)
+                    self.save_computed_vars_to_netcdf(path_file_in_computed, variables_storage)
 
                     # Remember that current file is computed
-                    self.computed_files[(member, domain)].append(
-                        path_file_in_computed)
-                    logger.debug(
-                        f"[COMPUTER] {run}, term {term}, domain {domain}{member_str} computed and saved")
+                    self.computed_files[(member, domain)].append(path_file_in_computed)
+                    logger.debug(f"[COMPUTER] {run}, term {term}, domain {domain}{member_str} computed and saved")
 
             self.delete_native_files()

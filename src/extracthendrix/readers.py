@@ -5,6 +5,7 @@ import os
 import configparser
 import pkg_resources
 from copy import deepcopy
+from time import sleep
 
 import ftplib
 from ftplib import FTP
@@ -310,7 +311,7 @@ class AromeHendrixReader(HendrixFileReader):
                  folderLayout=None,
                  model=None,
                  member=None,
-                 getmode='get',
+                 getmode='get' #"get"
                  ):
         """
         :param folderLayout: instance of the class FolderLayout. Gives information about the working directory.
@@ -379,11 +380,12 @@ class AromeHendrixReader(HendrixFileReader):
             if "term" in model_description:
                 standard_term = model_description.pop("term")
                 term = int(standard_term)
+                term_iteration = None
             resource_descriptions.append(dict(**model_description, date=date, term=term))
 
         if self.getmode == 'get':
             for resource in resource_descriptions:
-                resource['local'] = os.path.join(self.get_path_file_in_native(date, term))
+                resource['local'] = os.path.join(self.get_path_file_in_native(date, term_iteration))
 
         return resource_descriptions
 
