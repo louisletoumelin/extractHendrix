@@ -699,8 +699,7 @@ class ComputedValues:
             xx = len(ds.xx)
             yy = len(ds.yy)
             time = len(ds.time)
-            ds["CO2air"] = (("time", "xx", "yy"),
-                            np.full((time, xx, yy), 0.00062))
+            ds["CO2air"] = (("time", "xx", "yy"), np.full((time, xx, yy), 0.00062))
             if "Wind_DIR" not in ds:
                 ds["Wind_DIR"] = (("time", "xx", "yy"),
                                   np.zeros((time, xx, yy)))
